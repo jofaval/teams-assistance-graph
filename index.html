@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fullscreen File Drop Area</title>
+    <link rel="stylesheet" href="styles.css" />
+
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+  </head>
+
+  <body>
+    <section id="dropAreaView">
+      <div class="drop-area" id="dropArea">
+        <label for="fileInput"
+          >Drag & Drop your file here or click to upload</label
+        >
+        <input type="file" id="fileInput" />
+      </div>
+    </section>
+
+    <header>
+      <nav id="toolbar">
+        <button id="resetButton" onclick="enableDropArea()">
+          Reset dropArea files
+        </button>
+
+        <div class="attendees-duration-area">
+          <input
+            type="number"
+            name="attendeesDurationInput"
+            id="attendeesDurationInput"
+            placeholder="Attendees over X minutes"
+          />
+
+          <div class="attendees-duration-result"></div>
+        </div>
+      </nav>
+    </header>
+
+    <section id="graphView"></section>
+  </body>
+
+  <script src="main.js"></script>
+</html>

@@ -1,0 +1,113 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f3;
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.drop-area {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, #ffffff, #e6e6e6);
+  border-radius: 0;
+  box-shadow: inset 8px 8px 15px #d1d1d1, inset -8px -8px 15px #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: #555;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drop-area.drag-over {
+  background: linear-gradient(145deg, #e6e6e6, #ffffff);
+  box-shadow: inset 4px 4px 10px #d1d1d1, inset -4px -4px 10px #ffffff;
+}
+
+.drop-area input[type="file"] {
+  display: none;
+}
+
+.drop-area label {
+  display: block;
+  cursor: pointer;
+}
+
+header {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1000;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+#resetButton {
+  background-color: #f0f0f3;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.reset-button:hover {
+  background-color: #e6e6e6;
+}
+
+.reset-button:active {
+  background-color: #d1d1d1;
+}
+
+.attendees-duration-area {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+#attendeesDurationInput {
+  background-color: #f0f0f3;
+  border: none;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 16px;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease;
+}
+
+#attendeesDurationInput:hover {
+  background-color: #e6e6e6;
+}
+
+.attendees-duration-result {
+  background-color: #f0f0f3;
+  border: none;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 16px;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease;
+
+  width: 50px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  font-weight: bold;
+}
