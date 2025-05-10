@@ -160,7 +160,7 @@ function asTimeSeriesCount(rows) {
 function buildGraph(data) {
   Highcharts.chart("graphView", {
     chart: {
-      type: "line",
+      type: "area",
       width: window.innerWidth,
       height: window.innerHeight,
     },
