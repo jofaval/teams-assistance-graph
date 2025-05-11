@@ -171,8 +171,7 @@ class TeamsAttendance {
   }
 }
 
-let teamsAttendanceManager = new TeamsAttendance();
-console.log({ teamsAttendanceManager });
+let teamsAttendanceManager;
 
 const dropArea = document.getElementById("dropArea");
 const dropAreaView = document.getElementById("dropAreaView");
@@ -185,6 +184,15 @@ const attendeesDurationArea = document.querySelector(
 const attendeesDurationResult = document.querySelector(
   ".attendees-duration-result"
 );
+
+bootstrap();
+
+function bootstrap() {
+  teamsAttendanceManager = new TeamsAttendance();
+  console.log({ teamsAttendanceManager });
+
+  enableDropArea();
+}
 
 function enableGraphView() {
   dropAreaView.style.display = "none";
@@ -220,27 +228,6 @@ function enableDropArea() {
     element.textContent = "...";
   });
 }
-enableDropArea();
-
-// Prevent default behavior for drag events
-["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
-  dropArea.addEventListener(eventName, (e) => e.preventDefault());
-  dropArea.addEventListener(eventName, (e) => e.stopPropagation());
-});
-
-// Highlight drop area when file is dragged over
-["dragenter", "dragover"].forEach((eventName) => {
-  dropArea.addEventListener(eventName, () => {
-    dropArea.classList.add("drag-over");
-  });
-});
-
-// Remove highlight when file is dragged out
-["dragleave", "drop"].forEach((eventName) => {
-  dropArea.addEventListener(eventName, () => {
-    dropArea.classList.remove("drag-over");
-  });
-});
 
 function buildGraph(data) {
   Highcharts.chart("graphView", {
@@ -343,6 +330,26 @@ function fillGeneralStats() {
   document.querySelector(".unknown-attendees .stat-value").textContent =
     generalStats.unknownAttendees;
 }
+
+// Prevent default behavior for drag events
+["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+  dropArea.addEventListener(eventName, (e) => e.preventDefault());
+  dropArea.addEventListener(eventName, (e) => e.stopPropagation());
+});
+
+// Highlight drop area when file is dragged over
+["dragenter", "dragover"].forEach((eventName) => {
+  dropArea.addEventListener(eventName, () => {
+    dropArea.classList.add("drag-over");
+  });
+});
+
+// Remove highlight when file is dragged out
+["dragleave", "drop"].forEach((eventName) => {
+  dropArea.addEventListener(eventName, () => {
+    dropArea.classList.remove("drag-over");
+  });
+});
 
 dropArea.addEventListener("drop", (e) => {
   const files = e.dataTransfer.files;
