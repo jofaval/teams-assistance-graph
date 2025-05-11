@@ -1,5 +1,11 @@
 # Teams Assistance Graph
 
+## Table of Content
+
+- [Description](#description)
+- [Usage](#usage)
+- [Data Truth](#data-truth)
+
 ## Description
 
 Analyzes and graphs the attendance reports of a Microsoft Teams meeting. It provides insights into the attendance patterns of participants, allowing for queries about attendees over X minutes.
@@ -7,3 +13,7 @@ Analyzes and graphs the attendance reports of a Microsoft Teams meeting. It prov
 ## Usage
 
 Drop an attendance report, mind you, this has been designed for a Spanish report
+
+## Data Truth
+
+This does not account for users that have been on hold, which means that it's just an _approximation_. Take it with a grain of salt.
