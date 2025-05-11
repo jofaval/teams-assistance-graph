@@ -1,13 +1,26 @@
+const GENERAL_STATS = {
+  UNKNOWN: {
+    TITLE: 0,
+    AVERAGE_RETENTION: 6,
+    TOTAL_TIME: 5,
+    TOTAL_ATTENDEES: 1,
+    UNKNOWN_ATTENDEES: 2,
+  },
+  KNOWN: {
+    TITLE: 0,
+    AVERAGE_RETENTION: 5,
+    TOTAL_TIME: 4,
+    TOTAL_ATTENDEES: 1,
+  },
+};
+
 class TeamsAttendance {
   attendees = [];
-  generalStats = {
-    averageRetention: "",
-    retentionPercentage: "",
-    title: "",
-    totalAttendees: 0,
-    totalTime: "",
-    unknownAttendees: 0,
-  };
+  generalStats = {};
+
+  constructor() {
+    this.reset();
+  }
 
   parseDuration(time) {
     const parts = time.split(/\s+/);
@@ -77,20 +90,33 @@ class TeamsAttendance {
       .slice(1);
     console.log({ rows });
 
-    const averageRetention = this.getValueFromGeneralStats(rows[6]);
-    const totalTime = this.getValueFromGeneralStats(rows[5]);
+    const hasUnknownAttendees = rows.length === 7;
+    const accessor = hasUnknownAttendees
+      ? GENERAL_STATS.UNKNOWN
+      : GENERAL_STATS.KNOWN;
+
+    const averageRetention = this.getValueFromGeneralStats(
+      rows[accessor.AVERAGE_RETENTION]
+    );
+    const totalTime = this.getValueFromGeneralStats(rows[accessor.TOTAL_TIME]);
 
     const rawRetention =
       this.parseDuration(averageRetention) / this.parseDuration(totalTime);
     const retentionPercentage = Math.floor(rawRetention * 10_000) / 100;
 
     this.generalStats = {
-      title: this.getValueFromGeneralStats(rows[0]),
-      totalAttendees: parseInt(this.getValueFromGeneralStats(rows[1])),
+      title: this.getValueFromGeneralStats(rows[accessor.TITLE]),
+      totalAttendees: Number(
+        this.getValueFromGeneralStats(rows[accessor.TOTAL_ATTENDEES])
+      ),
       averageRetention,
       retentionPercentage: retentionPercentage + "%",
       totalTime,
-      unknownAttendees: parseInt(this.getValueFromGeneralStats(rows[2])),
+      unknownAttendees: hasUnknownAttendees
+        ? Number(
+            this.getValueFromGeneralStats(rows[accessor.UNKNOWN_ATTENDEES])
+          )
+        : 0,
     };
   }
 
@@ -168,6 +194,14 @@ class TeamsAttendance {
 
   reset() {
     this.attendees = [];
+    this.generalStats = {
+      averageRetention: "",
+      retentionPercentage: "",
+      title: "",
+      totalAttendees: 0,
+      totalTime: "",
+      unknownAttendees: 0,
+    };
   }
 }
 
