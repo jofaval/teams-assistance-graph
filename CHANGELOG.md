@@ -15,6 +15,7 @@
 
 - Refactored the code to use classes
 - Chart title is now the Meeting title
+- KPIs use Microsoft Teams Brand color
 
 ## 2025-05-10
 
