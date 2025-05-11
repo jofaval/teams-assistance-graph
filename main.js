@@ -2,6 +2,7 @@ class TeamsAttendance {
   attendees = [];
   generalStats = {
     averageRetention: "",
+    retentionPercentage: "",
     title: "",
     totalAttendees: 0,
     totalTime: "",
@@ -76,11 +77,19 @@ class TeamsAttendance {
       .slice(1);
     console.log({ rows });
 
+    const averageRetention = this.getValueFromGeneralStats(rows[6]);
+    const totalTime = this.getValueFromGeneralStats(rows[5]);
+
+    const rawRetention =
+      this.parseDuration(averageRetention) / this.parseDuration(totalTime);
+    const retentionPercentage = Math.floor(rawRetention * 10_000) / 100;
+
     this.generalStats = {
       title: this.getValueFromGeneralStats(rows[0]),
       totalAttendees: parseInt(this.getValueFromGeneralStats(rows[1])),
-      averageRetention: this.getValueFromGeneralStats(rows[6]),
-      totalTime: this.getValueFromGeneralStats(rows[5]),
+      averageRetention,
+      retentionPercentage: retentionPercentage + "%",
+      totalTime,
       unknownAttendees: parseInt(this.getValueFromGeneralStats(rows[2])),
     };
   }
@@ -168,6 +177,7 @@ console.log({ teamsAttendanceManager });
 const dropArea = document.getElementById("dropArea");
 const dropAreaView = document.getElementById("dropAreaView");
 const graphView = document.getElementById("graphView");
+const generalStats = document.getElementById("generalStats");
 
 const attendeesDurationArea = document.querySelector(
   ".attendees-duration-area"
@@ -180,6 +190,7 @@ function enableGraphView() {
   dropAreaView.style.display = "none";
   graphView.style.display = "block";
   attendeesDurationArea.style.display = "flex";
+  generalStats.style.display = "flex";
 }
 
 function resetEventListeners(element) {
@@ -190,6 +201,7 @@ function enableDropArea() {
   dropAreaView.style.display = "block";
   graphView.style.display = "none";
   attendeesDurationArea.style.display = "none";
+  generalStats.style.display = "none";
 
   const fileInput = document.getElementById("fileInput");
   fileInput.value = "";
@@ -203,6 +215,10 @@ function enableDropArea() {
   );
 
   teamsAttendanceManager.reset();
+
+  generalStats.querySelectorAll(".stat-value").forEach((element) => {
+    element.textContent = "...";
+  });
 }
 enableDropArea();
 
@@ -313,7 +329,21 @@ function prepareAttendeesDurationQuestion() {
   });
 }
 
-// Handle dropped files
+function fillGeneralStats() {
+  const generalStats = teamsAttendanceManager.generalStats;
+
+  document.querySelector(".total-attendees .stat-value").textContent =
+    generalStats.totalAttendees;
+  document.querySelector(".average-retention .stat-value").textContent =
+    generalStats.averageRetention;
+  document.querySelector(".retention-percentage .stat-value").textContent =
+    generalStats.retentionPercentage;
+  document.querySelector(".total-duration .stat-value").textContent =
+    generalStats.totalTime;
+  document.querySelector(".unknown-attendees .stat-value").textContent =
+    generalStats.unknownAttendees;
+}
+
 dropArea.addEventListener("drop", (e) => {
   const files = e.dataTransfer.files;
   console.log("Dropped files:", files);
@@ -339,6 +369,7 @@ dropArea.addEventListener("drop", (e) => {
 
     buildGraph(timeseries);
     prepareAttendeesDurationQuestion();
+    fillGeneralStats();
   };
 
   reader.readAsText(file); // Puedes usar readAsText, readAsDataURL, etc.
