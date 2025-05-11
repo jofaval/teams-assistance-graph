@@ -54,7 +54,8 @@ nav {
   gap: 1rem;
 }
 
-#resetButton {
+#resetButton,
+#copyAttendeesOverXMinutesClipboard {
   background-color: #f0f0f3;
   border: none;
   border-radius: 4px;
@@ -66,11 +67,13 @@ nav {
   transition: background-color 0.3s ease;
 }
 
-.reset-button:hover {
+#resetButton:hover,
+#copyAttendeesOverXMinutesClipboard:hover {
   background-color: #e6e6e6;
 }
 
-.reset-button:active {
+#resetButton:active,
+#copyAttendeesOverXMinutesClipboard:active {
   background-color: #d1d1d1;
 }
 

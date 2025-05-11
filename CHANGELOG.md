@@ -9,10 +9,12 @@
 - Copy to clipboard button for the attendees over X minutes
 - You can now click on a point in time to get the attendees at that time
 - License
+- You can now see the general stats for that meeting (avg retention, total attendees, etc.)
 
 ### Modified
 
 - Refactored the code to use classes
+- Chart title is now the Meeting title
 
 ## 2025-05-10
 

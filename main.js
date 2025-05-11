@@ -1,3 +1,170 @@
+class TeamsAttendance {
+  attendees = [];
+  generalStats = {
+    averageRetention: "",
+    title: "",
+    totalAttendees: 0,
+    totalTime: "",
+    unknownAttendees: 0,
+  };
+
+  parseDuration(time) {
+    const parts = time.split(/\s+/);
+
+    let hours = 0,
+      minutes = 0,
+      seconds = 0;
+
+    if (parts.length >= 2) {
+      seconds = parseInt(parts.at(-2));
+    }
+
+    if (parts.length >= 4) {
+      minutes = parseInt(parts.at(-4));
+    }
+
+    if (parts.length >= 6) {
+      hours = parseInt(parts.at(-6));
+    }
+
+    return hours * 60 * 60 + minutes * 60 + seconds;
+  }
+
+  parseDate(date) {
+    return new Date(date);
+  }
+
+  parseFile(content) {
+    return content.replaceAll("\t", ";").replaceAll("\r", "");
+  }
+
+  getRawAttendees(content) {
+    return content.split("2. ")[1].split("3. ")[0].trim().split("\n").slice(1);
+  }
+
+  parseAttendees(rawAttendees) {
+    const head = rawAttendees[0].split(";");
+    return rawAttendees
+      .slice(1)
+      .map((row) =>
+        Object.fromEntries(
+          row.split(";").map((item, index) => [head[index], item])
+        )
+      );
+  }
+
+  attendeesWithTimeStats(attendees) {
+    return attendees.map((row) => {
+      const start = this.parseDate(row["Primera entrada"]);
+      const duration = this.parseDuration(row["Duración de la reunión"]);
+
+      const end = new Date(start.getTime() + duration * 1000);
+      return { ...row, start, end };
+    });
+  }
+
+  getValueFromGeneralStats(line) {
+    return line.split(";").at(-1).trim();
+  }
+
+  parseGeneralStats(actualContent) {
+    const rows = actualContent
+      .trim()
+      .split("2. ")[0]
+      .trim()
+      .split("\n")
+      .slice(1);
+    console.log({ rows });
+
+    this.generalStats = {
+      title: this.getValueFromGeneralStats(rows[0]),
+      totalAttendees: parseInt(this.getValueFromGeneralStats(rows[1])),
+      averageRetention: this.getValueFromGeneralStats(rows[6]),
+      totalTime: this.getValueFromGeneralStats(rows[5]),
+      unknownAttendees: parseInt(this.getValueFromGeneralStats(rows[2])),
+    };
+  }
+
+  processFile(fileContent) {
+    const actualContent = this.parseFile(fileContent);
+    this.parseGeneralStats(actualContent);
+
+    const rawAttendees = this.getRawAttendees(actualContent);
+    const attendees = this.parseAttendees(rawAttendees);
+
+    this.attendees = this.attendeesWithTimeStats(attendees);
+
+    return this.attendees;
+  }
+
+  getTimeSeriesConstraints(attendees) {
+    const start = attendees.sort((a, b) => {
+      const startA = a.start.getTime();
+      const startB = b.start.getTime();
+
+      if (startA < startB) return -1;
+      if (startA > startB) return 1;
+
+      return 0;
+    })[0].start;
+
+    const end = attendees.sort((a, b) => {
+      const endA = a.end.getTime();
+      const endB = b.end.getTime();
+
+      if (endA < endB) return 1;
+      if (endA > endB) return -1;
+
+      return 0;
+    })[0].end;
+
+    return { start, end };
+  }
+
+  dateBetweenRange({ start, end, needle }) {
+    return needle >= start && needle <= end;
+  }
+
+  getAttendeesAsTimeSeries() {
+    const { start, end } = this.getTimeSeriesConstraints(this.attendees);
+
+    const interval = (end.getTime() - start.getTime()) / 1_000;
+
+    const timeSeries = [];
+    for (let index = 1; index <= interval; index++) {
+      const now = new Date(start.getTime() + index * 1000);
+
+      const count = this.attendees.filter(({ start, end }) => {
+        return this.dateBetweenRange({ start, end, needle: now });
+      }).length;
+
+      timeSeries.push({ x: now, y: count });
+    }
+
+    return timeSeries;
+  }
+
+  getAttendeesOverXMinutes(minutes) {
+    return this.attendees.filter((attendee) => {
+      const duration = (attendee.end - attendee.start) / 1000 / 60;
+      return duration > minutes;
+    });
+  }
+
+  getAttendeesAtPointInTime(date) {
+    return this.attendees.filter(({ start, end }) => {
+      return this.dateBetweenRange({ start, end, needle: date });
+    });
+  }
+
+  reset() {
+    this.attendees = [];
+  }
+}
+
+let teamsAttendanceManager = new TeamsAttendance();
+console.log({ teamsAttendanceManager });
+
 const dropArea = document.getElementById("dropArea");
 const dropAreaView = document.getElementById("dropAreaView");
 const graphView = document.getElementById("graphView");
@@ -15,6 +182,10 @@ function enableGraphView() {
   attendeesDurationArea.style.display = "flex";
 }
 
+function resetEventListeners(element) {
+  element.outerHTML = element.outerHTML;
+}
+
 function enableDropArea() {
   dropAreaView.style.display = "block";
   graphView.style.display = "none";
@@ -26,8 +197,12 @@ function enableDropArea() {
   attendeesDurationResult.innerHTML = "";
   document.getElementById("attendeesDurationInput").value = "0";
   // remove all attached events
-  document.getElementById("attendeesDurationInput").outerHTML =
-    document.getElementById("attendeesDurationInput").outerHTML;
+  resetEventListeners(document.getElementById("attendeesDurationInput"));
+  resetEventListeners(
+    document.getElementById("copyAttendeesOverXMinutesClipboard")
+  );
+
+  teamsAttendanceManager.reset();
 }
 enableDropArea();
 
@@ -51,121 +226,24 @@ enableDropArea();
   });
 });
 
-function processDuration(time) {
-  const parts = time.split(/\s+/);
-
-  let hours = 0,
-    minutes = 0,
-    seconds = 0;
-
-  if (parts.length >= 2) {
-    seconds = parseInt(parts.at(-2));
-  }
-
-  if (parts.length >= 4) {
-    minutes = parseInt(parts.at(-4));
-  }
-
-  if (parts.length >= 6) {
-    hours = parseInt(parts.at(-6));
-  }
-
-  return hours * 60 * 60 + minutes * 60 + seconds;
-}
-
-function processDate(date) {
-  return new Date(date);
-}
-
-function processFile(fileContent) {
-  const actualContent = fileContent
-    .replaceAll("\t", ";")
-    .replaceAll("\r", "")
-    .split("2. ")[1]
-    .split("3. ")[0]
-    .trim()
-    .split("\n")
-    .slice(1);
-
-  const head = actualContent[0].split(";");
-  const attendance = actualContent
-    .slice(1)
-    .map((row) =>
-      Object.fromEntries(
-        row.split(";").map((item, index) => [head[index], item])
-      )
-    );
-
-  const timeReportAttendance = attendance.map((row) => {
-    const start = processDate(row["Primera entrada"]);
-    const duration = processDuration(row["Duración de la reunión"]);
-
-    const end = new Date(start.getTime() + duration * 1000);
-    return { ...row, start, end, duration };
-  });
-
-  return timeReportAttendance;
-}
-
-function betweenRange({ start, end, needle }) {
-  const startTime = start;
-  const endTime = end;
-  const needleTime = needle;
-
-  return needleTime >= startTime && needleTime <= endTime;
-}
-
-function asTimeSeriesCount(rows) {
-  const start = rows.sort((a, b) => {
-    const startA = a.start.getTime();
-    const startB = b.start.getTime();
-
-    if (startA < startB) return -1;
-    if (startA > startB) return 1;
-
-    return 0;
-  })[0].start;
-
-  const end = rows.sort((a, b) => {
-    const endA = a.end.getTime();
-    const endB = b.end.getTime();
-
-    if (endA < endB) return 1;
-    if (endA > endB) return -1;
-
-    return 0;
-  })[0].end;
-
-  const interval = (end.getTime() - start.getTime()) / 1_000;
-
-  const timeSeries = [];
-  for (let index = 1; index <= interval; index++) {
-    const count = rows.filter((row) => {
-      return betweenRange({
-        start: row.start,
-        end: row.end,
-        needle: new Date(start.getTime() + index * 1000),
-      });
-    }).length;
-
-    timeSeries.push({
-      x: new Date(start.getTime() + index * 1000),
-      y: count,
-    });
-  }
-
-  return timeSeries;
-}
-
 function buildGraph(data) {
   Highcharts.chart("graphView", {
     chart: {
       type: "area",
       width: window.innerWidth,
       height: window.innerHeight,
+      events: {
+        click: function (event) {
+          const attendees = teamsAttendanceManager.getAttendeesAtPointInTime(
+            event.xAxis[0].value
+          );
+          console.log("Asistentes en el momento:", attendees);
+          copyAttendeesToClipboard(attendees);
+        },
+      },
     },
     title: {
-      text: "Attendance Over Time",
+      text: teamsAttendanceManager.generalStats.title,
     },
     xAxis: {
       type: "datetime",
@@ -190,25 +268,30 @@ function buildGraph(data) {
   });
 }
 
-function prepareAttendeesDurationQuestion(attendees) {
-  const attendeesDuration = attendees.map((row) => {
-    return {
-      name: row["Nombre"],
-      duration: (row.end - row.start) / 1000 / 60,
-    };
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    console.log("Texto copiado al portapapeles:", text);
   });
+}
 
+function copyAttendeesToClipboard(attendees) {
+  const text = attendees
+    .map((attendee) => `${attendee["Id. de participante (UPN)"]};`)
+    .join("\n");
+
+  copyToClipboard(text);
+}
+
+function prepareAttendeesDurationQuestion() {
   const input = document.getElementById("attendeesDurationInput");
 
   input.addEventListener("input", (e) => {
     console.log(`Asistentes con duración mayor a ${e.target.value} minutos:`);
-    const targetDuration = parseInt(e.target.value);
-    const attendeesDurationOverX = attendeesDuration.filter((row) => {
-      return row.duration > targetDuration;
-    });
+    const attendeesDurationOverX =
+      teamsAttendanceManager.getAttendeesOverXMinutes(parseInt(e.target.value));
 
     console.log(
-      `Asistentes con duración mayor a ${targetDuration} minutos:`,
+      `Asistentes con duración mayor a ${e.target.value} minutos:`,
       attendeesDurationOverX
     );
 
@@ -218,7 +301,16 @@ function prepareAttendeesDurationQuestion(attendees) {
   input.value = "0";
   input.dispatchEvent(new Event("input"));
 
-  console.log("Duración de los asistentes:", attendeesDuration);
+  const copyAttendeesOverXMinutesClipboard = document.getElementById(
+    "copyAttendeesOverXMinutesClipboard"
+  );
+
+  copyAttendeesOverXMinutesClipboard.addEventListener("click", () => {
+    const minutes = parseInt(input.value);
+    copyAttendeesToClipboard(
+      teamsAttendanceManager.getAttendeesOverXMinutes(minutes)
+    );
+  });
 }
 
 // Handle dropped files
@@ -240,13 +332,14 @@ dropArea.addEventListener("drop", (e) => {
   // Leer el contenido del archivo (si es necesario)
   const reader = new FileReader();
   reader.onload = function (event) {
-    const attendees = processFile(event.target.result);
-    const timeSeriesAttendance = asTimeSeriesCount(attendees);
+    teamsAttendanceManager.processFile(event.target.result);
 
-    console.log(`Contenido del archivo (${file.name}):`, timeSeriesAttendance);
+    const timeseries = teamsAttendanceManager.getAttendeesAsTimeSeries();
+    console.log(`Contenido del archivo (${file.name}):`, timeseries);
 
-    buildGraph(timeSeriesAttendance);
-    prepareAttendeesDurationQuestion(attendees);
+    buildGraph(timeseries);
+    prepareAttendeesDurationQuestion();
   };
+
   reader.readAsText(file); // Puedes usar readAsText, readAsDataURL, etc.
 });
