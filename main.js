@@ -278,6 +278,17 @@ function buildGraph(data) {
           copyAttendeesToClipboard(attendees);
         },
       },
+      zooming: {
+        type: "x",
+        resetButton: {
+          position: {
+            align: "center",
+            x: -30,
+            y: 35,
+          },
+          relativeTo: "chart",
+        },
+      },
     },
     title: {
       text: teamsAttendanceManager.generalStats.title,
