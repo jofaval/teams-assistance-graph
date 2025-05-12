@@ -14,6 +14,13 @@ const GENERAL_STATS = {
   },
 };
 
+const USER_ENTRY_KEY = {
+  FIRST_ENTRY: 1,
+  LAST_ENTRY: 2,
+  LENGTH: 3,
+  EMAIL: 4,
+};
+
 class TeamsAttendance {
   attendees = [];
   generalStats = {};
@@ -22,12 +29,25 @@ class TeamsAttendance {
     this.reset();
   }
 
-  parseDuration(time) {
+  parseSpanishDuration(time) {
     const parts = time.split(/\s+/);
 
     let hours = 0,
       minutes = 0,
       seconds = 0;
+
+    for (let index = 0; index < parts.length; index += 2) {
+      const element = parts[index];
+
+      const type = parts[index + 1];
+      if (type.includes("s")) {
+        seconds = parseInt(element);
+      } else if (type.includes("min")) {
+        minutes = parseInt(element);
+      } else if (type.includes("h")) {
+        hours = parseInt(element);
+      }
+    }
 
     if (parts.length >= 2) {
       seconds = parseInt(parts.at(-2));
@@ -44,6 +64,37 @@ class TeamsAttendance {
     return hours * 60 * 60 + minutes * 60 + seconds;
   }
 
+  parseEnglishDuration(time) {
+    const parts = time.split(/\s+/);
+
+    let hours = 0,
+      minutes = 0,
+      seconds = 0;
+
+    parts.forEach((part) => {
+      if (part.includes("s")) {
+        return (seconds = parseInt(part));
+      } else if (part.includes("m")) {
+        return (minutes = parseInt(part));
+      } else if (part.includes("h")) {
+        return (hours = parseInt(part));
+      }
+    });
+
+    return hours * 60 * 60 + minutes * 60 + seconds;
+  }
+
+  /**
+   * @param {string} time
+   */
+  parseDuration(time) {
+    if (/\s(s|min|h)/.test(time)) {
+      return this.parseSpanishDuration(time);
+    } else {
+      return this.parseEnglishDuration(time);
+    }
+  }
+
   parseDate(date) {
     return new Date(date);
   }
@@ -57,23 +108,25 @@ class TeamsAttendance {
   }
 
   parseAttendees(rawAttendees) {
-    const head = rawAttendees[0].split(";");
-    return rawAttendees
-      .slice(1)
-      .map((row) =>
-        Object.fromEntries(
-          row.split(";").map((item, index) => [head[index], item])
-        )
-      );
+    return rawAttendees.slice(1).map((attendee) => {
+      const values = attendee.split(";");
+
+      return {
+        firstEntry: values[USER_ENTRY_KEY.FIRST_ENTRY],
+        lastEntry: values[USER_ENTRY_KEY.FIRST_ENTRY + 1],
+        length: values[USER_ENTRY_KEY.LENGTH],
+        email: values[USER_ENTRY_KEY.EMAIL],
+      };
+    });
   }
 
   attendeesWithTimeStats(attendees) {
-    return attendees.map((row) => {
-      const start = this.parseDate(row["Primera entrada"]);
-      const duration = this.parseDuration(row["Duración de la reunión"]);
+    return attendees.map((attendee) => {
+      const start = this.parseDate(attendee.firstEntry);
+      const duration = this.parseDuration(attendee.length);
 
       const end = new Date(start.getTime() + duration * 1000);
-      return { ...row, start, end };
+      return { ...attendee, start, end };
     });
   }
 
@@ -88,7 +141,6 @@ class TeamsAttendance {
       .trim()
       .split("\n")
       .slice(1);
-    console.log({ rows });
 
     const hasUnknownAttendees = rows.length === 7;
     const accessor = hasUnknownAttendees
@@ -103,6 +155,16 @@ class TeamsAttendance {
     const rawRetention =
       this.parseDuration(averageRetention) / this.parseDuration(totalTime);
     const retentionPercentage = Math.floor(rawRetention * 10_000) / 100;
+    console.log({
+      averageRetention: this.parseDuration(averageRetention),
+      totalTime: this.parseDuration(totalTime),
+      retentionPercentage,
+      rawRetention,
+      rawTime: this.getValueFromGeneralStats(rows[accessor.TOTAL_TIME]),
+      rawAverage: this.getValueFromGeneralStats(
+        rows[accessor.AVERAGE_RETENTION]
+      ),
+    });
 
     this.generalStats = {
       title: this.getValueFromGeneralStats(rows[accessor.TITLE]),
@@ -224,6 +286,7 @@ bootstrap();
 function bootstrap() {
   teamsAttendanceManager = new TeamsAttendance();
   console.log({ teamsAttendanceManager });
+  window.dev = { teamsAttendanceManager };
 
   enableDropArea();
 }
@@ -242,6 +305,7 @@ function resetEventListeners(element) {
 function enableDropArea() {
   dropAreaView.style.display = "block";
   graphView.style.display = "none";
+  graphView.innerHTML = "";
   attendeesDurationArea.style.display = "none";
   generalStats.style.display = "none";
 
@@ -323,9 +387,7 @@ function copyToClipboard(text) {
 }
 
 function copyAttendeesToClipboard(attendees) {
-  const text = attendees
-    .map((attendee) => `${attendee["Id. de participante (UPN)"]};`)
-    .join("\n");
+  const text = attendees.map((attendee) => `${attendee.email};`).join("\n");
 
   copyToClipboard(text);
 }
