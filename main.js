@@ -182,6 +182,26 @@ class TeamsAttendance {
     };
   }
 
+  getTotalWatchTimeStat(attendees) {
+    const totalWatchHours = attendees.reduce((acc, attendee) => {
+      const duration = (attendee.end - attendee.start) / 1000 / 60;
+      return acc + duration;
+    }, 0);
+    const hours = Math.floor(totalWatchHours / 60);
+    const minutes = Math.floor(totalWatchHours % 60);
+    const seconds = Math.floor((totalWatchHours * 60) % 60);
+
+    return { hours, minutes, seconds };
+  }
+
+  parseTotalWatchHoursStat(attendees) {
+    const { hours, minutes } = this.getTotalWatchTimeStat(attendees);
+
+    document.querySelector(
+      "#generalStats .total-watch-hours .stat-value"
+    ).innerHTML = `${hours}h ${minutes}m`;
+  }
+
   processFile(fileContent) {
     const actualContent = this.parseFile(fileContent);
     this.parseGeneralStats(actualContent);
@@ -190,6 +210,7 @@ class TeamsAttendance {
     const attendees = this.parseAttendees(rawAttendees);
 
     this.attendees = this.attendeesWithTimeStats(attendees);
+    this.parseTotalWatchHoursStat(this.attendees);
 
     return this.attendees;
   }
