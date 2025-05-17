@@ -23,6 +23,7 @@ const USER_ENTRY_KEY = {
 
 class TeamsAttendance {
   attendees = [];
+  clipboardAttendees = [];
   generalStats = {};
 
   constructor() {
@@ -155,16 +156,6 @@ class TeamsAttendance {
     const rawRetention =
       this.parseDuration(averageRetention) / this.parseDuration(totalTime);
     const retentionPercentage = Math.floor(rawRetention * 10_000) / 100;
-    console.log({
-      averageRetention: this.parseDuration(averageRetention),
-      totalTime: this.parseDuration(totalTime),
-      retentionPercentage,
-      rawRetention,
-      rawTime: this.getValueFromGeneralStats(rows[accessor.TOTAL_TIME]),
-      rawAverage: this.getValueFromGeneralStats(
-        rows[accessor.AVERAGE_RETENTION]
-      ),
-    });
 
     this.generalStats = {
       title: this.getValueFromGeneralStats(rows[accessor.TITLE]),
@@ -182,6 +173,14 @@ class TeamsAttendance {
     };
   }
 
+  getHoursMinutesSeconds(duration) {
+    const hours = Math.floor(duration / 3600);
+    const minutes = Math.floor((duration % 3600) / 60);
+    const seconds = Math.floor(duration % 60);
+
+    return { hours, minutes, seconds };
+  }
+
   getTotalWatchTimeStat(attendees) {
     const totalWatchHours = attendees.reduce((acc, attendee) => {
       const duration = (attendee.end - attendee.start) / 1000 / 60;
@@ -194,12 +193,20 @@ class TeamsAttendance {
     return { hours, minutes, seconds };
   }
 
-  parseTotalWatchHoursStat(attendees) {
-    const { hours, minutes } = this.getTotalWatchTimeStat(attendees);
+  formatTimeStat({ hours, minutes, seconds }) {
+    return [
+      hours > 0 ? hours + "h" : undefined,
+      minutes > 0 ? minutes + "m" : undefined,
+      seconds > 0 ? seconds + "s" : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
 
-    document.querySelector(
-      "#generalStats .total-watch-hours .stat-value"
-    ).innerHTML = `${hours}h ${minutes}m`;
+  parseTotalWatchHoursStat(attendees) {
+    const { hours, minutes, seconds } = this.getTotalWatchTimeStat(attendees);
+
+    return this.formatTimeStat({ hours, minutes, seconds });
   }
 
   processFile(fileContent) {
@@ -210,7 +217,10 @@ class TeamsAttendance {
     const attendees = this.parseAttendees(rawAttendees);
 
     this.attendees = this.attendeesWithTimeStats(attendees);
-    this.parseTotalWatchHoursStat(this.attendees);
+    this.generalStats.totalWatchHours = this.parseTotalWatchHoursStat(
+      this.attendees
+    );
+    this.clipboardAttendees = this.attendees;
 
     return this.attendees;
   }
@@ -263,7 +273,7 @@ class TeamsAttendance {
   }
 
   getAttendeesOverXMinutes(minutes) {
-    return this.attendees.filter((attendee) => {
+    return this.clipboardAttendees.filter((attendee) => {
       const duration = (attendee.end - attendee.start) / 1000 / 60;
       return duration > minutes;
     });
@@ -275,8 +285,73 @@ class TeamsAttendance {
     });
   }
 
+  getAttendeesBetweenDates({ start: first, end: last }) {
+    return this.attendees.filter((attendee) => {
+      return (
+        (attendee.start >= first && attendee.start <= last) ||
+        (attendee.end >= first && attendee.end <= last) ||
+        (first >= attendee.start && last <= attendee.end)
+      );
+    });
+  }
+
+  getTimeStatsFromAttendees({ attendees, start, end }) {
+    const totalTime = (end - start) / 1000;
+
+    const averageTime =
+      attendees.reduce((acc, attendee) => {
+        const duration =
+          Math.min(end, attendee.end) - Math.max(start, attendee.start);
+        return acc + duration;
+      }, 0) /
+      attendees.length /
+      1000;
+
+    return {
+      averageRetention: this.formatTimeStat(
+        this.getHoursMinutesSeconds(averageTime)
+      ),
+      retentionPercentage:
+        Math.floor((averageTime / totalTime) * 10000) / 100 + "%",
+      totalTime: this.formatTimeStat(this.getHoursMinutesSeconds(totalTime)),
+    };
+  }
+
+  getGeneralStatsFromAttendeesInRange({ attendees, start, end }) {
+    const { averageRetention, retentionPercentage, totalTime } =
+      this.getTimeStatsFromAttendees({ attendees, start, end });
+
+    const totalAttendees = attendees.length;
+    const unknownAttendees = this.generalStats.unknownAttendees;
+    const totalWatchTime = this.parseTotalWatchHoursStat(attendees);
+
+    return {
+      averageRetention,
+      retentionPercentage,
+      title: this.generalStats.title,
+      totalAttendees,
+      totalTime,
+      unknownAttendees,
+      totalWatchHours: totalWatchTime,
+    };
+  }
+
+  getAttendeesRange() {
+    const { start, end } = this.getTimeSeriesConstraints(this.attendees);
+
+    return {
+      start,
+      end,
+    };
+  }
+
+  setClipboardAttendees(attendees) {
+    this.clipboardAttendees = attendees;
+  }
+
   reset() {
     this.attendees = [];
+    this.clipboardAttendees = [];
     this.generalStats = {
       averageRetention: "",
       retentionPercentage: "",
@@ -284,10 +359,14 @@ class TeamsAttendance {
       totalAttendees: 0,
       totalTime: "",
       unknownAttendees: 0,
+      totalWatchHours: "",
     };
   }
 }
 
+/**
+ * @type {TeamsAttendance}
+ */
 let teamsAttendanceManager;
 
 const dropArea = document.getElementById("dropArea");
@@ -349,7 +428,7 @@ function enableDropArea() {
 }
 
 function buildGraph(data) {
-  Highcharts.chart("graphView", {
+  const chart = Highcharts.chart("graphView", {
     chart: {
       type: "area",
       width: window.innerWidth,
@@ -383,6 +462,44 @@ function buildGraph(data) {
       title: {
         text: "Time",
       },
+      events: {
+        setExtremes: function (e) {
+          let start, end;
+
+          if (typeof e.min == "undefined" && typeof e.max == "undefined") {
+            const attendeesRange = teamsAttendanceManager.getAttendeesRange();
+            start = attendeesRange.start;
+            end = attendeesRange.end;
+          } else {
+            start = new Date(e.min);
+            end = new Date(e.max);
+          }
+
+          const attendees = teamsAttendanceManager.getAttendeesBetweenDates({
+            start,
+            end,
+          });
+          teamsAttendanceManager.setClipboardAttendees(attendees);
+
+          console.log("Asistentes en el rango de fechas:", {
+            start,
+            end,
+            attendees,
+            atStart: teamsAttendanceManager.getAttendeesAtPointInTime(start),
+          });
+
+          const input = document.getElementById("attendeesDurationInput");
+          input.dispatchEvent(new Event("input"));
+
+          fillGeneralStats(
+            teamsAttendanceManager.getGeneralStatsFromAttendeesInRange({
+              attendees,
+              start,
+              end,
+            })
+          );
+        },
+      },
     },
     yAxis: {
       title: {
@@ -399,6 +516,8 @@ function buildGraph(data) {
       timezoneOffset: new Date().getTimezoneOffset(),
     },
   });
+
+  chart.redraw();
 }
 
 function copyToClipboard(text) {
@@ -444,9 +563,7 @@ function prepareAttendeesDurationQuestion() {
   });
 }
 
-function fillGeneralStats() {
-  const generalStats = teamsAttendanceManager.generalStats;
-
+function fillGeneralStats(generalStats) {
   document.querySelector(".total-attendees .stat-value").textContent =
     generalStats.totalAttendees;
   document.querySelector(".average-retention .stat-value").textContent =
@@ -457,6 +574,8 @@ function fillGeneralStats() {
     generalStats.totalTime;
   document.querySelector(".unknown-attendees .stat-value").textContent =
     generalStats.unknownAttendees;
+  document.querySelector(".total-watch-hours .stat-value").textContent =
+    generalStats.totalWatchHours;
 }
 
 // Prevent default behavior for drag events
@@ -504,7 +623,7 @@ dropArea.addEventListener("drop", (e) => {
 
     buildGraph(timeseries);
     prepareAttendeesDurationQuestion();
-    fillGeneralStats();
+    fillGeneralStats(teamsAttendanceManager.generalStats);
   };
 
   reader.readAsText(file); // Puedes usar readAsText, readAsDataURL, etc.

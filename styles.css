@@ -119,8 +119,10 @@ nav {
   position: absolute;
   top: 1rem;
   right: 1rem;
+
   display: flex;
   justify-content: end;
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
