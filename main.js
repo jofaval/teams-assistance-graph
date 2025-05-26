@@ -380,6 +380,7 @@ const attendeesDurationArea = document.querySelector(
 const attendeesDurationResult = document.querySelector(
   ".attendees-duration-result"
 );
+const distributionChart = document.querySelector("#distribution-chart")
 
 bootstrap();
 
@@ -396,6 +397,7 @@ function enableGraphView() {
   graphView.style.display = "block";
   attendeesDurationArea.style.display = "flex";
   generalStats.style.display = "flex";
+  distributionChart.style.display = "flex";
 }
 
 function resetEventListeners(element) {
@@ -408,6 +410,7 @@ function enableDropArea() {
   graphView.innerHTML = "";
   attendeesDurationArea.style.display = "none";
   generalStats.style.display = "none";
+  distributionChart.style.display = "none";
 
   const fileInput = document.getElementById("fileInput");
   fileInput.value = "";
@@ -424,6 +427,65 @@ function enableDropArea() {
 
   generalStats.querySelectorAll(".stat-value").forEach((element) => {
     element.textContent = "...";
+  });
+}
+
+function setDistributionQuartileValue({ value, number, total }) {
+  const quartile = document.getElementById(`distribution-quartile-${number}`);
+  if (!quartile) {
+    return;
+  }
+
+  quartile.innerHTML = Math.floor(((value / total) * 10000) / 100) + "%";
+  quartile.title = value;
+}
+
+function getQuartilesFromAttendees(totalTime) {
+  const quartiles = { q1: 0, q2: 0, q3: 0, q4: 0 };
+
+  const parsedTime = teamsAttendanceManager.parseDuration(totalTime) / 60;
+  const interval = Math.floor(parsedTime / 4);
+
+  quartiles.q1 =
+    teamsAttendanceManager.getAttendeesOverXMinutes(interval).length;
+  quartiles.q2 = teamsAttendanceManager.getAttendeesOverXMinutes(
+    interval * 2
+  ).length;
+  quartiles.q3 = teamsAttendanceManager.getAttendeesOverXMinutes(
+    interval * 3
+  ).length;
+  quartiles.q4 = teamsAttendanceManager.getAttendeesOverXMinutes(
+    interval * 4
+  ).length;
+
+  return quartiles;
+}
+
+function fillDistributionChart({ attendees, totalTime }) {
+  const { q1, q2, q3, q4 } = getQuartilesFromAttendees(totalTime);
+
+  console.log({ q1, q2, q3, q4 });
+  const total = attendees.length;
+
+  setDistributionQuartileValue({
+    value: q1,
+    number: 1,
+    total,
+  });
+  setDistributionQuartileValue({
+    value: q2,
+    number: 2,
+    total,
+  });
+  setDistributionQuartileValue({
+    value: q3,
+    number: 3,
+    total,
+  });
+  setDistributionQuartileValue({
+    value: q4,
+    number: 4,
+    total,
   });
 }
 
@@ -491,13 +553,18 @@ function buildGraph(data) {
           const input = document.getElementById("attendeesDurationInput");
           input.dispatchEvent(new Event("input"));
 
-          fillGeneralStats(
+          const generalStats =
             teamsAttendanceManager.getGeneralStatsFromAttendeesInRange({
               attendees,
               start,
               end,
-            })
-          );
+            });
+
+          fillGeneralStats(generalStats);
+          fillDistributionChart({
+            attendees,
+            totalTime: generalStats.totalTime,
+          });
         },
       },
     },
@@ -624,6 +691,10 @@ dropArea.addEventListener("drop", (e) => {
     buildGraph(timeseries);
     prepareAttendeesDurationQuestion();
     fillGeneralStats(teamsAttendanceManager.generalStats);
+    fillDistributionChart({
+      attendees: teamsAttendanceManager.attendees,
+      totalTime: teamsAttendanceManager.generalStats.totalTime,
+    });
   };
 
   reader.readAsText(file); // Puedes usar readAsText, readAsDataURL, etc.

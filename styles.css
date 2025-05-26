@@ -152,3 +152,42 @@ nav {
 #generalStats .stat-label {
   font-size: 1rem;
 }
+
+#distribution-chart {
+  position: fixed;
+  bottom: 1rem;
+  left: 2.5vw;
+
+  transition: all 0.1s ease-in-out;
+
+  width: 95vw;
+  
+  display: flex;
+  justify-content: stretch;
+}
+
+.distribution-quartile {
+  width: 100%;
+  min-width: 100px;
+
+  padding: .75rem;
+
+  text-align: center;
+  color: white;
+}
+
+#distribution-quartile-1 {
+  background-color: #0070ad;
+}
+
+#distribution-quartile-2 {
+  background-color: #12ABDB;
+}
+
+#distribution-quartile-3 {
+  background-color: #338091;
+}
+
+#distribution-quartile-4 {
+  background-color: #14596B;
+}
