@@ -149,7 +149,7 @@ class TeamsAttendance {
       : GENERAL_STATS.KNOWN;
 
     const averageRetention = this.getValueFromGeneralStats(
-      rows[accessor.AVERAGE_RETENTION]
+      rows[accessor.AVERAGE_RETENTION],
     );
     const totalTime = this.getValueFromGeneralStats(rows[accessor.TOTAL_TIME]);
 
@@ -160,14 +160,14 @@ class TeamsAttendance {
     this.generalStats = {
       title: this.getValueFromGeneralStats(rows[accessor.TITLE]),
       totalAttendees: Number(
-        this.getValueFromGeneralStats(rows[accessor.TOTAL_ATTENDEES])
+        this.getValueFromGeneralStats(rows[accessor.TOTAL_ATTENDEES]),
       ),
       averageRetention,
       retentionPercentage: retentionPercentage + "%",
       totalTime,
       unknownAttendees: hasUnknownAttendees
         ? Number(
-            this.getValueFromGeneralStats(rows[accessor.UNKNOWN_ATTENDEES])
+            this.getValueFromGeneralStats(rows[accessor.UNKNOWN_ATTENDEES]),
           )
         : 0,
     };
@@ -218,7 +218,7 @@ class TeamsAttendance {
 
     this.attendees = this.attendeesWithTimeStats(attendees);
     this.generalStats.totalWatchHours = this.parseTotalWatchHoursStat(
-      this.attendees
+      this.attendees,
     );
     this.clipboardAttendees = this.attendees;
 
@@ -309,7 +309,7 @@ class TeamsAttendance {
 
     return {
       averageRetention: this.formatTimeStat(
-        this.getHoursMinutesSeconds(averageTime)
+        this.getHoursMinutesSeconds(averageTime),
       ),
       retentionPercentage:
         Math.floor((averageTime / totalTime) * 10000) / 100 + "%",
@@ -375,12 +375,12 @@ const graphView = document.getElementById("graphView");
 const generalStats = document.getElementById("generalStats");
 
 const attendeesDurationArea = document.querySelector(
-  ".attendees-duration-area"
+  ".attendees-duration-area",
 );
 const attendeesDurationResult = document.querySelector(
-  ".attendees-duration-result"
+  ".attendees-duration-result",
 );
-const distributionChart = document.querySelector("#distribution-chart")
+const distributionChart = document.querySelector("#distribution-chart");
 
 bootstrap();
 
@@ -420,7 +420,7 @@ function enableDropArea() {
   // remove all attached events
   resetEventListeners(document.getElementById("attendeesDurationInput"));
   resetEventListeners(
-    document.getElementById("copyAttendeesOverXMinutesClipboard")
+    document.getElementById("copyAttendeesOverXMinutesClipboard"),
   );
 
   teamsAttendanceManager.reset();
@@ -449,13 +449,13 @@ function getQuartilesFromAttendees(totalTime) {
   quartiles.q1 =
     teamsAttendanceManager.getAttendeesOverXMinutes(interval).length;
   quartiles.q2 = teamsAttendanceManager.getAttendeesOverXMinutes(
-    interval * 2
+    interval * 2,
   ).length;
   quartiles.q3 = teamsAttendanceManager.getAttendeesOverXMinutes(
-    interval * 3
+    interval * 3,
   ).length;
   quartiles.q4 = teamsAttendanceManager.getAttendeesOverXMinutes(
-    interval * 4
+    interval * 4,
   ).length;
 
   return quartiles;
@@ -498,7 +498,7 @@ function buildGraph(data) {
       events: {
         click: function (event) {
           const attendees = teamsAttendanceManager.getAttendeesAtPointInTime(
-            event.xAxis[0].value
+            event.xAxis[0].value,
           );
           console.log("Asistentes en el momento:", attendees);
           copyAttendeesToClipboard(attendees);
@@ -514,6 +514,20 @@ function buildGraph(data) {
           },
           relativeTo: "chart",
         },
+      },
+    },
+    tooltip: {
+      enabled: true,
+      shared: true,
+      formatter: function () {
+        const point = this.point;
+        const moment = Highcharts.dateFormat("%Y-%m-%d %H:%M:%S", point.x);
+        const retention = (
+          (point.y / teamsAttendanceManager.generalStats.totalAttendees) *
+          100
+        ).toFixed(2);
+
+        return `${moment}<br/><strong>${point.y}</strong> attendees | <strong>${retention}</strong>% of retention`;
       },
     },
     title: {
@@ -609,7 +623,7 @@ function prepareAttendeesDurationQuestion() {
 
     console.log(
       `Asistentes con duración mayor a ${e.target.value} minutos:`,
-      attendeesDurationOverX
+      attendeesDurationOverX,
     );
 
     attendeesDurationResult.innerHTML = attendeesDurationOverX.length;
@@ -619,13 +633,13 @@ function prepareAttendeesDurationQuestion() {
   input.dispatchEvent(new Event("input"));
 
   const copyAttendeesOverXMinutesClipboard = document.getElementById(
-    "copyAttendeesOverXMinutesClipboard"
+    "copyAttendeesOverXMinutesClipboard",
   );
 
   copyAttendeesOverXMinutesClipboard.addEventListener("click", () => {
     const minutes = parseInt(input.value);
     copyAttendeesToClipboard(
-      teamsAttendanceManager.getAttendeesOverXMinutes(minutes)
+      teamsAttendanceManager.getAttendeesOverXMinutes(minutes),
     );
   });
 }
