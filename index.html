@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Teams Attendance Report Graph Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
 
     <link rel="shortcut icon" type="image/x-icon" href="teams-logo.ico" />
@@ -47,52 +53,54 @@
       </nav>
     </header>
 
-    <aside id="generalStats">
-      <div class="stat total-attendees" title="Total attendees">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Total attendees</span>
-      </div>
-      <div class="stat unknown-attendees" title="Unknown attendees">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Unknown attendees</span>
-      </div>
-      <div class="stat average-retention" title="Average retention">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Average retention</span>
-      </div>
-      <div class="stat retention-percentage" title="Retention percentage">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Retention percentage</span>
-      </div>
-      <div class="stat total-duration" title="Total duration">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Total duration</span>
-      </div>
-      <div class="stat total-watch-hours" title="Total watch hours">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Total watch hours</span>
-      </div>
-      <div class="stat total-reactions" title="Total reactions">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Total reactions</span>
-      </div>
-      <div class="stat participants-reacted" title="Participants reacted">
-        <span class="stat-value">...</span>
-        <span class="stat-label">Participants reacted</span>
-      </div>
-    </aside>
+    <main id="dashboard">
+      <section id="graphView"></section>
 
-    <section id="graphView"></section>
+      <aside id="generalStats">
+        <div class="stat total-attendees" title="Total attendees">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Total attendees</span>
+        </div>
+        <div class="stat unknown-attendees" title="Unknown attendees">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Unknown attendees</span>
+        </div>
+        <div class="stat average-retention" title="Average retention">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Average retention</span>
+        </div>
+        <div class="stat retention-percentage" title="Retention percentage">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Retention percentage</span>
+        </div>
+        <div class="stat total-duration" title="Total duration">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Total duration</span>
+        </div>
+        <div class="stat total-watch-hours" title="Total watch hours">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Total watch hours</span>
+        </div>
+        <div class="stat total-reactions" title="Total reactions">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Total reactions</span>
+        </div>
+        <div class="stat participants-reacted" title="Participants reacted">
+          <span class="stat-value">...</span>
+          <span class="stat-label">Participants reacted</span>
+        </div>
+      </aside>
 
-    <section id="distribution-chart">
-      <div id="distribution-quartile-1" class="distribution-quartile"></div>
+      <section id="distribution-chart">
+        <div id="distribution-quartile-1" class="distribution-quartile"></div>
 
-      <div id="distribution-quartile-2" class="distribution-quartile"></div>
+        <div id="distribution-quartile-2" class="distribution-quartile"></div>
 
-      <div id="distribution-quartile-3" class="distribution-quartile"></div>
+        <div id="distribution-quartile-3" class="distribution-quartile"></div>
 
-      <div id="distribution-quartile-4" class="distribution-quartile"></div>
-    </section>
+        <div id="distribution-quartile-4" class="distribution-quartile"></div>
+      </section>
+    </main>
   </body>
 
   <script src="main.js"></script>

@@ -679,8 +679,8 @@ function enableGraphView() {
   dropAreaView.style.display = "none";
   graphView.style.display = "block";
   attendeesDurationArea.style.display = "flex";
-  generalStats.style.display = "flex";
-  distributionChart.style.display = "flex";
+  generalStats.style.display = "grid";
+  distributionChart.style.display = "grid";
 }
 
 function resetEventListeners(element) {
@@ -799,8 +799,6 @@ function buildGraph(data) {
   const chart = Highcharts.chart("graphView", {
     chart: {
       type: "area",
-      width: window.innerWidth,
-      height: window.innerHeight,
       events: {
         click: function (event) {
           const attendees = teamsAttendanceManager.getAttendeesAtPointInTime(
@@ -902,6 +900,10 @@ function buildGraph(data) {
     time: {
       timezoneOffset: new Date().getTimezoneOffset(),
     },
+  });
+
+  window.requestAnimationFrame(() => {
+    chart.reflow();
   });
 
   chart.redraw();

@@ -1,11 +1,14 @@
 body {
-  font-family: Arial, sans-serif;
-  background-color: #f0f0f3;
+  font-family: "IBM Plex Sans", sans-serif;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(18, 171, 219, 0.12), transparent 45%),
+    radial-gradient(circle at 85% 10%, rgba(80, 90, 201, 0.1), transparent 40%),
+    #edf2f8;
   margin: 0;
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
 }
 
 .drop-area {
@@ -42,82 +45,88 @@ body {
 }
 
 header {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  z-index: 1000;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 1rem 1.25rem 0.75rem;
+  backdrop-filter: blur(4px);
 }
 
 nav {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 #resetButton,
 #copyAttendeesOverXMinutesClipboard {
-  background-color: #f0f0f3;
+  background-color: #f4f8fc;
   border: none;
-  border-radius: 4px;
-  padding: 10px 20px;
-  font-size: 16px;
-  font-weight: bold;
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: "Space Grotesk", sans-serif;
+  box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
 #resetButton:hover,
 #copyAttendeesOverXMinutesClipboard:hover {
-  background-color: #e6e6e6;
+  background-color: #e5eef8;
+  transform: translateY(-1px);
 }
 
 #resetButton:active,
 #copyAttendeesOverXMinutesClipboard:active {
-  background-color: #d1d1d1;
+  background-color: #d6e4f2;
 }
 
 .attendees-duration-area {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 #attendeesDurationInput {
-  background-color: #f0f0f3;
+  background-color: #f4f8fc;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   padding: 10px;
-  font-size: 16px;
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   transition: background-color 0.3s ease;
+  min-width: 185px;
 }
 
 #timeResolution {
-  background-color: #f0f0f3;
+  background-color: #f4f8fc;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   padding: 10px;
-  font-size: 16px;
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   transition: background-color 0.3s ease;
 }
 
 #attendeesDurationInput:hover {
-  background-color: #e6e6e6;
+  background-color: #e5eef8;
 }
 
 #timeResolution:hover {
-  background-color: #e6e6e6;
+  background-color: #e5eef8;
 }
 
 .attendees-duration-result {
-  background-color: #f0f0f3;
+  background-color: #f4f8fc;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   padding: 10px;
-  font-size: 16px;
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   transition: background-color 0.3s ease;
 
   width: 50px;
@@ -129,65 +138,74 @@ nav {
   font-weight: bold;
 }
 
-#generalStats {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
+#dashboard {
+  min-height: 0;
+  padding: 0 1.25rem 1rem;
+  display: grid;
+  grid-template-rows: minmax(320px, 1fr) auto auto;
+  gap: 0.8rem;
+}
 
-  display: flex;
-  justify-content: end;
-  flex-wrap: wrap;
-  gap: 1rem;
+#graphView {
+  min-height: 320px;
+  width: 100%;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fefeff 0%, #f7fbff 100%);
+  box-shadow: 0 18px 36px rgba(30, 55, 90, 0.1);
+  overflow: hidden;
+}
+
+#generalStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.55rem;
 }
 
 #generalStats .stat {
-  /** 464eb8 */
-  background-color: #505ac9;
+  background: linear-gradient(130deg, #4252a8, #355894);
   border: none;
-  border-radius: 4px;
-  padding: 10px;
-  font-size: 24px;
-  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.3s ease;
+  border-radius: 12px;
+  padding: 10px 8px;
+  font-size: 20px;
+  box-shadow: 0 8px 20px rgba(26, 42, 77, 0.18);
+  transition: background-color 0.3s ease, transform 0.2s ease;
   display: flex;
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  min-width: 75px;
-  height: 50px;
-  z-index: 1000;
+  min-width: 120px;
+  height: 56px;
   color: #fff;
 }
 
 #generalStats .stat:hover {
-  background-color: #7b83eb;
+  background: linear-gradient(130deg, #5166cd, #4175bb);
+  transform: translateY(-1px);
 }
 
 #generalStats .stat-label {
-  font-size: 1rem;
+  font-size: 0.8rem;
+  line-height: 1.05;
+  opacity: 0.88;
 }
 
 #distribution-chart {
-  position: fixed;
-  bottom: 1rem;
-  left: 2.5vw;
-
-  transition: all 0.1s ease-in-out;
-
-  width: 95vw;
-  
-  display: flex;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   justify-content: stretch;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .distribution-quartile {
-  width: 100%;
-  min-width: 100px;
-
-  padding: .75rem;
-
+  width: auto;
+  min-width: 0;
+  padding: 0.75rem;
   text-align: center;
   color: white;
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
 }
 
 #distribution-quartile-1 {
@@ -195,7 +213,39 @@ nav {
 }
 
 #distribution-quartile-2 {
-  background-color: #12ABDB;
+  background-color: #12abdb;
+}
+
+@media (max-width: 900px) {
+  body {
+    grid-template-rows: auto 1fr;
+    overflow: auto;
+  }
+
+  header {
+    padding: 0.8rem 0.85rem 0.5rem;
+  }
+
+  #dashboard {
+    padding: 0 0.85rem 0.85rem;
+    grid-template-rows: minmax(260px, 1fr) auto auto;
+  }
+
+  #graphView {
+    min-height: 260px;
+  }
+
+  #generalStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #distribution-chart {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #attendeesDurationInput {
+    min-width: 150px;
+  }
 }
 
 #distribution-quartile-3 {
