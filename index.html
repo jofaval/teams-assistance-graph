@@ -35,6 +35,11 @@
             placeholder="Attendees over X minutes"
           />
 
+          <select id="timeResolution" title="Timeline resolution">
+            <option value="minute" selected>Per minute</option>
+            <option value="second">Per second</option>
+          </select>
+
           <div class="attendees-duration-result"></div>
 
           <button id="copyAttendeesOverXMinutesClipboard">📋</button>
@@ -66,6 +71,14 @@
       <div class="stat total-watch-hours" title="Total watch hours">
         <span class="stat-value">...</span>
         <span class="stat-label">Total watch hours</span>
+      </div>
+      <div class="stat total-reactions" title="Total reactions">
+        <span class="stat-value">...</span>
+        <span class="stat-label">Total reactions</span>
+      </div>
+      <div class="stat participants-reacted" title="Participants reacted">
+        <span class="stat-value">...</span>
+        <span class="stat-label">Participants reacted</span>
       </div>
     </aside>
 

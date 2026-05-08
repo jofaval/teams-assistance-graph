@@ -25,42 +25,32 @@ class TeamsAttendance {
   attendees = [];
   clipboardAttendees = [];
   generalStats = {};
+  activityEntries = [];
+  interactionEvents = [];
+  reactionEvents = [];
+  attendeesByKey = new Map();
 
   constructor() {
     this.reset();
   }
 
   parseSpanishDuration(time) {
-    const parts = time.split(/\s+/);
+    const cleanTime = time.replaceAll("\u00a0", " ").trim();
+    const matches = [...cleanTime.matchAll(/(\d+)\s*(h|min|s)/g)];
 
-    let hours = 0,
-      minutes = 0,
-      seconds = 0;
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
 
-    for (let index = 0; index < parts.length; index += 2) {
-      const element = parts[index];
-
-      const type = parts[index + 1];
-      if (type.includes("s")) {
-        seconds = parseInt(element);
-      } else if (type.includes("min")) {
-        minutes = parseInt(element);
-      } else if (type.includes("h")) {
-        hours = parseInt(element);
+    matches.forEach(([, amount, unit]) => {
+      if (unit === "h") {
+        hours = parseInt(amount);
+      } else if (unit === "min") {
+        minutes = parseInt(amount);
+      } else if (unit === "s") {
+        seconds = parseInt(amount);
       }
-    }
-
-    if (parts.length >= 2) {
-      seconds = parseInt(parts.at(-2));
-    }
-
-    if (parts.length >= 4) {
-      minutes = parseInt(parts.at(-4));
-    }
-
-    if (parts.length >= 6) {
-      hours = parseInt(parts.at(-6));
-    }
+    });
 
     return hours * 60 * 60 + minutes * 60 + seconds;
   }
@@ -97,51 +87,215 @@ class TeamsAttendance {
   }
 
   parseDate(date) {
-    return new Date(date);
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return null;
+    }
+
+    return parsedDate;
   }
 
   parseFile(content) {
-    return content.replaceAll("\t", ";").replaceAll("\r", "");
+    return content
+      .replaceAll("\t", ";")
+      .replaceAll("\r", "")
+      .replaceAll("\u00a0", " ");
+  }
+
+  getSectionContent(content, sectionNumber) {
+    const sectionPattern = new RegExp(
+      `(?:^|\\n)${sectionNumber}\\. [^\\n]*\\n([\\s\\S]*?)(?=\\n\\d+\\. [^\\n]*\\n|$)`,
+    );
+    const match = content.match(sectionPattern);
+
+    return match ? match[1].trim() : "";
   }
 
   getRawAttendees(content) {
-    return content.split("2. ")[1].split("3. ")[0].trim().split("\n").slice(1);
+    return content
+      .trim()
+      .split("\n")
+      .map((row) => row.trim())
+      .filter(Boolean);
   }
 
   parseAttendees(rawAttendees) {
-    return rawAttendees.slice(1).map((attendee) => {
-      const values = attendee.split(";");
+    return rawAttendees
+      .slice(1)
+      .map((attendee) => {
+        const values = attendee.split(";");
+        const participantName = values[0]?.trim();
+        const email = values[USER_ENTRY_KEY.EMAIL]?.trim();
+        const identityKey = (email || participantName || "").toLowerCase();
 
-      return {
-        firstEntry: values[USER_ENTRY_KEY.FIRST_ENTRY],
-        lastEntry: values[USER_ENTRY_KEY.FIRST_ENTRY + 1],
-        length: values[USER_ENTRY_KEY.LENGTH],
-        email: values[USER_ENTRY_KEY.EMAIL],
-      };
-    });
+        return {
+          participantName,
+          firstEntry: values[USER_ENTRY_KEY.FIRST_ENTRY],
+          lastEntry: values[USER_ENTRY_KEY.LAST_ENTRY],
+          length: values[USER_ENTRY_KEY.LENGTH],
+          email,
+          identityKey,
+        };
+      })
+      .filter((attendee) => attendee.identityKey);
   }
 
   attendeesWithTimeStats(attendees) {
-    return attendees.map((attendee) => {
-      const start = this.parseDate(attendee.firstEntry);
-      const duration = this.parseDuration(attendee.length);
+    return attendees
+      .map((attendee) => {
+        const start = this.parseDate(attendee.firstEntry);
+        const durationSeconds = this.parseDuration(attendee.length);
 
-      const end = new Date(start.getTime() + duration * 1000);
-      return { ...attendee, start, end };
+        if (!start || Number.isNaN(durationSeconds)) {
+          return null;
+        }
+
+        const end = new Date(start.getTime() + durationSeconds * 1000);
+
+        return {
+          ...attendee,
+          start,
+          end,
+          durationSeconds,
+          segments: [{ start, end }],
+        };
+      })
+      .filter(Boolean);
+  }
+
+  parseMeetingActivities(rawActivities) {
+    return rawActivities
+      .slice(1)
+      .map((activity) => {
+        const values = activity.split(";");
+        const participantName = values[0]?.trim();
+        const start = this.parseDate(values[1]);
+        const end = this.parseDate(values[2]);
+        const email = values[4]?.trim();
+        const identityKey = (email || participantName || "").toLowerCase();
+
+        if (!participantName || !start || !end || !identityKey) {
+          return null;
+        }
+
+        return {
+          participantName,
+          email,
+          start,
+          end,
+          identityKey,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  aggregateAttendeesFromActivities(activityEntries) {
+    const attendeesMap = new Map();
+
+    activityEntries.forEach((entry) => {
+      const current = attendeesMap.get(entry.identityKey);
+      const durationSeconds = Math.max(0, (entry.end - entry.start) / 1000);
+
+      if (!current) {
+        attendeesMap.set(entry.identityKey, {
+          participantName: entry.participantName,
+          email: entry.email,
+          identityKey: entry.identityKey,
+          start: entry.start,
+          end: entry.end,
+          durationSeconds,
+          segments: [{ start: entry.start, end: entry.end }],
+        });
+        return;
+      }
+
+      current.start = new Date(Math.min(current.start.getTime(), entry.start.getTime()));
+      current.end = new Date(Math.max(current.end.getTime(), entry.end.getTime()));
+      current.durationSeconds += durationSeconds;
+      current.segments.push({ start: entry.start, end: entry.end });
     });
+
+    return [...attendeesMap.values()];
+  }
+
+  normalizeInteractionType(rawType) {
+    return rawType.replaceAll('""', '"').replace(/^"|"$/g, "").trim();
+  }
+
+  extractReactionType(type) {
+    const normalizedType = this.normalizeInteractionType(type).toLowerCase();
+    if (!normalizedType.includes("reacción enviada")) {
+      return null;
+    }
+
+    const reaction = normalizedType
+      .replace("reacción enviada", "")
+      .replaceAll('"', "")
+      .trim();
+
+    return reaction || null;
+  }
+
+  parseMeetingInteractions(rawInteractions) {
+    return rawInteractions
+      .slice(1)
+      .map((interaction) => {
+        const values = interaction.split(";");
+        const participantName = values[0]?.trim();
+        const interactionType = values[1]?.trim();
+        const timestamp = this.parseDate(values[2]);
+
+        if (!participantName || !interactionType || !timestamp) {
+          return null;
+        }
+
+        const normalizedType = this.normalizeInteractionType(interactionType);
+        const reactionType = this.extractReactionType(interactionType);
+
+        return {
+          participantName,
+          interactionType: normalizedType,
+          reactionType,
+          isReaction: Boolean(reactionType),
+          timestamp,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  getReactionStats({ start, end, totalAttendees }) {
+    const reactionsInRange = this.reactionEvents.filter((reaction) => {
+      if (!start || !end) {
+        return true;
+      }
+
+      return this.dateBetweenRange({
+        start,
+        end,
+        needle: reaction.timestamp,
+      });
+    });
+
+    const participantsReacted = new Set(
+      reactionsInRange.map((reaction) => reaction.participantName),
+    ).size;
+
+    return {
+      totalReactions: reactionsInRange.length,
+      participantsReacted,
+    };
   }
 
   getValueFromGeneralStats(line) {
     return line.split(";").at(-1).trim();
   }
 
-  parseGeneralStats(actualContent) {
-    const rows = actualContent
-      .trim()
-      .split("2. ")[0]
-      .trim()
-      .split("\n")
-      .slice(1);
+  parseGeneralStats(summarySection) {
+    const rows = summarySection.trim().split("\n").filter(Boolean);
+
+    if (rows.length === 0) {
+      return;
+    }
 
     const hasUnknownAttendees = rows.length === 7;
     const accessor = hasUnknownAttendees
@@ -170,6 +324,8 @@ class TeamsAttendance {
             this.getValueFromGeneralStats(rows[accessor.UNKNOWN_ATTENDEES]),
           )
         : 0,
+      totalReactions: 0,
+      participantsReacted: 0,
     };
   }
 
@@ -183,7 +339,10 @@ class TeamsAttendance {
 
   getTotalWatchTimeStat(attendees) {
     const totalWatchHours = attendees.reduce((acc, attendee) => {
-      const duration = (attendee.end - attendee.start) / 1000 / 60;
+      const duration =
+        attendee.durationSeconds != null
+          ? attendee.durationSeconds / 60
+          : (attendee.end - attendee.start) / 1000 / 60;
       return acc + duration;
     }, 0);
     const hours = Math.floor(totalWatchHours / 60);
@@ -211,22 +370,68 @@ class TeamsAttendance {
 
   processFile(fileContent) {
     const actualContent = this.parseFile(fileContent);
-    this.parseGeneralStats(actualContent);
 
-    const rawAttendees = this.getRawAttendees(actualContent);
+    const summarySection = this.getSectionContent(actualContent, 1);
+    const participantsSection = this.getSectionContent(actualContent, 2);
+    const activitiesSection = this.getSectionContent(actualContent, 3);
+    const interactionsSection = this.getSectionContent(actualContent, 4);
+
+    this.parseGeneralStats(summarySection);
+
+    const rawAttendees = this.getRawAttendees(participantsSection);
     const attendees = this.parseAttendees(rawAttendees);
+    const section2Attendees = this.attendeesWithTimeStats(attendees);
 
-    this.attendees = this.attendeesWithTimeStats(attendees);
+    const rawActivities = this.getRawAttendees(activitiesSection);
+    this.activityEntries = this.parseMeetingActivities(rawActivities);
+    this.attendees =
+      this.activityEntries.length > 0
+        ? this.aggregateAttendeesFromActivities(this.activityEntries)
+        : section2Attendees;
+
+    this.attendeesByKey = new Map(
+      this.attendees.map((attendee) => [attendee.identityKey, attendee]),
+    );
+
+    const rawInteractions = this.getRawAttendees(interactionsSection);
+    this.interactionEvents = this.parseMeetingInteractions(rawInteractions);
+    this.reactionEvents = this.interactionEvents.filter(
+      (interaction) => interaction.isReaction,
+    );
+
     this.generalStats.totalWatchHours = this.parseTotalWatchHoursStat(
       this.attendees,
     );
+
+    const attendeesRange = this.getAttendeesRange();
+    const reactionStats = this.getReactionStats({
+      start: attendeesRange.start,
+      end: attendeesRange.end,
+      totalAttendees: this.attendees.length,
+    });
+
+    this.generalStats.totalReactions = reactionStats.totalReactions;
+    this.generalStats.participantsReacted = reactionStats.participantsReacted;
+
     this.clipboardAttendees = this.attendees;
 
     return this.attendees;
   }
 
-  getTimeSeriesConstraints(attendees) {
-    const start = attendees.sort((a, b) => {
+  getTimelineEntries() {
+    if (this.activityEntries.length > 0) {
+      return this.activityEntries;
+    }
+
+    return this.attendees.map((attendee) => ({
+      start: attendee.start,
+      end: attendee.end,
+      identityKey: attendee.identityKey,
+    }));
+  }
+
+  getTimeSeriesConstraints(entries) {
+    const start = [...entries].sort((a, b) => {
       const startA = a.start.getTime();
       const startB = b.start.getTime();
 
@@ -236,7 +441,7 @@ class TeamsAttendance {
       return 0;
     })[0].start;
 
-    const end = attendees.sort((a, b) => {
+    const end = [...entries].sort((a, b) => {
       const endA = a.end.getTime();
       const endB = b.end.getTime();
 
@@ -253,18 +458,28 @@ class TeamsAttendance {
     return needle >= start && needle <= end;
   }
 
-  getAttendeesAsTimeSeries() {
-    const { start, end } = this.getTimeSeriesConstraints(this.attendees);
+  getAttendeesAsTimeSeries(resolution = "minute") {
+    const entries = this.getTimelineEntries();
+    if (entries.length === 0) {
+      return [];
+    }
 
-    const interval = (end.getTime() - start.getTime()) / 1_000;
+    const { start, end } = this.getTimeSeriesConstraints(entries);
+
+    const stepMs = resolution === "second" ? 1_000 : 60_000;
+    const interval = Math.floor((end.getTime() - start.getTime()) / stepMs);
 
     const timeSeries = [];
-    for (let index = 1; index <= interval; index++) {
-      const now = new Date(start.getTime() + index * 1000);
+    for (let index = 0; index <= interval; index++) {
+      const now = new Date(start.getTime() + index * stepMs);
 
-      const count = this.attendees.filter(({ start, end }) => {
+      const activeEntries = entries.filter(({ start, end }) => {
         return this.dateBetweenRange({ start, end, needle: now });
-      }).length;
+      });
+
+      const count = new Set(
+        activeEntries.map((entry) => entry.identityKey),
+      ).size;
 
       timeSeries.push({ x: now, y: count });
     }
@@ -274,34 +489,80 @@ class TeamsAttendance {
 
   getAttendeesOverXMinutes(minutes) {
     return this.clipboardAttendees.filter((attendee) => {
-      const duration = (attendee.end - attendee.start) / 1000 / 60;
+      const duration =
+        attendee.durationSeconds != null
+          ? attendee.durationSeconds / 60
+          : (attendee.end - attendee.start) / 1000 / 60;
       return duration > minutes;
     });
   }
 
   getAttendeesAtPointInTime(date) {
-    return this.attendees.filter(({ start, end }) => {
-      return this.dateBetweenRange({ start, end, needle: date });
-    });
+    const needle = new Date(date);
+    const entries = this.getTimelineEntries();
+
+    const keys = new Set(
+      entries
+        .filter(({ start, end }) => {
+          return this.dateBetweenRange({ start, end, needle });
+        })
+        .map((entry) => entry.identityKey),
+    );
+
+    return [...keys]
+      .map((key) => this.attendeesByKey.get(key))
+      .filter(Boolean);
   }
 
   getAttendeesBetweenDates({ start: first, end: last }) {
-    return this.attendees.filter((attendee) => {
-      return (
-        (attendee.start >= first && attendee.start <= last) ||
-        (attendee.end >= first && attendee.end <= last) ||
-        (first >= attendee.start && last <= attendee.end)
-      );
-    });
+    const entries = this.getTimelineEntries();
+
+    const keys = new Set(
+      entries
+        .filter((entry) => {
+          return (
+            (entry.start >= first && entry.start <= last) ||
+            (entry.end >= first && entry.end <= last) ||
+            (first >= entry.start && last <= entry.end)
+          );
+        })
+        .map((entry) => entry.identityKey),
+    );
+
+    return [...keys]
+      .map((key) => this.attendeesByKey.get(key))
+      .filter(Boolean);
+  }
+
+  getAttendeeOverlapInRange({ attendee, start, end }) {
+    if (attendee.segments?.length) {
+      return attendee.segments.reduce((acc, segment) => {
+        const overlap = Math.max(
+          0,
+          Math.min(end, segment.end) - Math.max(start, segment.start),
+        );
+
+        return acc + overlap;
+      }, 0);
+    }
+
+    return Math.max(0, Math.min(end, attendee.end) - Math.max(start, attendee.start));
   }
 
   getTimeStatsFromAttendees({ attendees, start, end }) {
     const totalTime = (end - start) / 1000;
 
+    if (attendees.length === 0 || totalTime <= 0) {
+      return {
+        averageRetention: "0s",
+        retentionPercentage: "0%",
+        totalTime: this.formatTimeStat(this.getHoursMinutesSeconds(totalTime)),
+      };
+    }
+
     const averageTime =
       attendees.reduce((acc, attendee) => {
-        const duration =
-          Math.min(end, attendee.end) - Math.max(start, attendee.start);
+        const duration = this.getAttendeeOverlapInRange({ attendee, start, end });
         return acc + duration;
       }, 0) /
       attendees.length /
@@ -324,6 +585,11 @@ class TeamsAttendance {
     const totalAttendees = attendees.length;
     const unknownAttendees = this.generalStats.unknownAttendees;
     const totalWatchTime = this.parseTotalWatchHoursStat(attendees);
+    const reactionsStats = this.getReactionStats({
+      start,
+      end,
+      totalAttendees,
+    });
 
     return {
       averageRetention,
@@ -333,11 +599,22 @@ class TeamsAttendance {
       totalTime,
       unknownAttendees,
       totalWatchHours: totalWatchTime,
+      totalReactions: reactionsStats.totalReactions,
+      participantsReacted: reactionsStats.participantsReacted,
     };
   }
 
   getAttendeesRange() {
-    const { start, end } = this.getTimeSeriesConstraints(this.attendees);
+    const entries = this.getTimelineEntries();
+    if (entries.length === 0) {
+      const now = new Date();
+      return {
+        start: now,
+        end: now,
+      };
+    }
+
+    const { start, end } = this.getTimeSeriesConstraints(entries);
 
     return {
       start,
@@ -352,6 +629,10 @@ class TeamsAttendance {
   reset() {
     this.attendees = [];
     this.clipboardAttendees = [];
+    this.activityEntries = [];
+    this.interactionEvents = [];
+    this.reactionEvents = [];
+    this.attendeesByKey = new Map();
     this.generalStats = {
       averageRetention: "",
       retentionPercentage: "",
@@ -360,6 +641,8 @@ class TeamsAttendance {
       totalTime: "",
       unknownAttendees: 0,
       totalWatchHours: "",
+      totalReactions: 0,
+      participantsReacted: 0,
     };
   }
 }
@@ -422,11 +705,34 @@ function enableDropArea() {
   resetEventListeners(
     document.getElementById("copyAttendeesOverXMinutesClipboard"),
   );
+  resetEventListeners(document.getElementById("timeResolution"));
 
   teamsAttendanceManager.reset();
 
   generalStats.querySelectorAll(".stat-value").forEach((element) => {
     element.textContent = "...";
+  });
+}
+
+function getTimelineResolution() {
+  const selector = document.getElementById("timeResolution");
+  return selector?.value === "second" ? "second" : "minute";
+}
+
+function redrawGraphUsingSelectedResolution() {
+  const timeseries = teamsAttendanceManager.getAttendeesAsTimeSeries(
+    getTimelineResolution(),
+  );
+
+  buildGraph(timeseries);
+}
+
+function prepareTimeResolutionSelector() {
+  const selector = document.getElementById("timeResolution");
+  selector.value = "minute";
+
+  selector.addEventListener("change", () => {
+    redrawGraphUsingSelectedResolution();
   });
 }
 
@@ -608,7 +914,11 @@ function copyToClipboard(text) {
 }
 
 function copyAttendeesToClipboard(attendees) {
-  const text = attendees.map((attendee) => `${attendee.email};`).join("\n");
+  const text = attendees
+    .map((attendee) => attendee.email)
+    .filter(Boolean)
+    .map((email) => `${email};`)
+    .join("\n");
 
   copyToClipboard(text);
 }
@@ -657,6 +967,19 @@ function fillGeneralStats(generalStats) {
     generalStats.unknownAttendees;
   document.querySelector(".total-watch-hours .stat-value").textContent =
     generalStats.totalWatchHours;
+  document.querySelector(".total-reactions .stat-value").textContent =
+    generalStats.totalReactions;
+  document.querySelector(".participants-reacted .stat-value").textContent =
+    generalStats.participantsReacted;
+}
+
+function decodeFileContent(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const isUtf16Le = bytes[0] === 0xff && bytes[1] === 0xfe;
+  const isUtf16Be = bytes[0] === 0xfe && bytes[1] === 0xff;
+  const encoding = isUtf16Le ? "utf-16le" : isUtf16Be ? "utf-16be" : "utf-8";
+
+  return new TextDecoder(encoding).decode(bytes);
 }
 
 // Prevent default behavior for drag events
@@ -694,16 +1017,20 @@ dropArea.addEventListener("drop", (e) => {
   // Example: Display file names in the console
   console.log(`File name: ${file.name}`);
 
-  // Leer el contenido del archivo (si es necesario)
   const reader = new FileReader();
   reader.onload = function (event) {
-    teamsAttendanceManager.processFile(event.target.result);
+    const decodedContent = decodeFileContent(event.target.result);
 
-    const timeseries = teamsAttendanceManager.getAttendeesAsTimeSeries();
+    teamsAttendanceManager.processFile(decodedContent);
+
+    const timeseries = teamsAttendanceManager.getAttendeesAsTimeSeries(
+      getTimelineResolution(),
+    );
     console.log(`Contenido del archivo (${file.name}):`, timeseries);
 
     buildGraph(timeseries);
     prepareAttendeesDurationQuestion();
+    prepareTimeResolutionSelector();
     fillGeneralStats(teamsAttendanceManager.generalStats);
     fillDistributionChart({
       attendees: teamsAttendanceManager.attendees,
@@ -711,5 +1038,5 @@ dropArea.addEventListener("drop", (e) => {
     });
   };
 
-  reader.readAsText(file); // Puedes usar readAsText, readAsDataURL, etc.
+  reader.readAsArrayBuffer(file);
 });
