@@ -155,6 +155,35 @@ nav {
   overflow: hidden;
 }
 
+#executiveSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.summary-item {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(66, 82, 168, 0.2);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.summary-label {
+  color: #43567b;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.summary-value {
+  color: #142645;
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-family: "Space Grotesk", sans-serif;
+}
+
 #generalStats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -178,6 +207,16 @@ nav {
   color: #fff;
 }
 
+#generalStats .stat-featured {
+  background: linear-gradient(130deg, #2f4f98, #17639f);
+  min-height: 66px;
+}
+
+#generalStats .stat-featured .stat-value {
+  font-size: 1.42rem;
+  line-height: 1;
+}
+
 #generalStats .stat:hover {
   background: linear-gradient(130deg, #5166cd, #4175bb);
   transform: translateY(-1px);
@@ -187,6 +226,15 @@ nav {
   font-size: 0.8rem;
   line-height: 1.05;
   opacity: 0.88;
+}
+
+#resetButton:focus-visible,
+#copyAttendeesOverXMinutesClipboard:focus-visible,
+#attendeesDurationInput:focus-visible,
+#timeResolution:focus-visible,
+#generalStats .stat:focus-visible {
+  outline: 3px solid #0a84ff;
+  outline-offset: 2px;
 }
 
 #distribution-chart {
@@ -237,6 +285,10 @@ nav {
 
   #generalStats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #executiveSummary {
+    grid-template-columns: 1fr;
   }
 
   #distribution-chart {

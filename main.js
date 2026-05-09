@@ -651,6 +651,8 @@ class TeamsAttendance {
  * @type {TeamsAttendance}
  */
 let teamsAttendanceManager;
+const CRITICAL_DROP_THRESHOLD = 0.2;
+const TOOLTIP_MOVING_AVERAGE_WINDOW = 5;
 
 const dropArea = document.getElementById("dropArea");
 const dropAreaView = document.getElementById("dropAreaView");
@@ -664,6 +666,7 @@ const attendeesDurationResult = document.querySelector(
   ".attendees-duration-result",
 );
 const distributionChart = document.querySelector("#distribution-chart");
+const executiveSummary = document.getElementById("executiveSummary");
 
 bootstrap();
 
@@ -679,6 +682,7 @@ function enableGraphView() {
   dropAreaView.style.display = "none";
   graphView.style.display = "block";
   attendeesDurationArea.style.display = "flex";
+  executiveSummary.style.display = "grid";
   generalStats.style.display = "grid";
   distributionChart.style.display = "grid";
 }
@@ -692,6 +696,7 @@ function enableDropArea() {
   graphView.style.display = "none";
   graphView.innerHTML = "";
   attendeesDurationArea.style.display = "none";
+  executiveSummary.style.display = "none";
   generalStats.style.display = "none";
   distributionChart.style.display = "none";
 
@@ -712,6 +717,10 @@ function enableDropArea() {
   generalStats.querySelectorAll(".stat-value").forEach((element) => {
     element.textContent = "...";
   });
+
+  document.getElementById("summaryTotalAttendees").textContent = "...";
+  document.getElementById("summaryAverageRetention").textContent = "...";
+  document.getElementById("summaryTotalTime").textContent = "...";
 }
 
 function getTimelineResolution() {
@@ -725,6 +734,12 @@ function redrawGraphUsingSelectedResolution() {
   );
 
   buildGraph(timeseries);
+
+  const attendeesRange = teamsAttendanceManager.getAttendeesRange();
+  updateDashboardForRange({
+    start: attendeesRange.start,
+    end: attendeesRange.end,
+  });
 }
 
 function prepareTimeResolutionSelector() {
@@ -736,66 +751,173 @@ function prepareTimeResolutionSelector() {
   });
 }
 
-function setDistributionQuartileValue({ value, number, total }) {
+function setDistributionQuartileValue({ label, value, number, total }) {
   const quartile = document.getElementById(`distribution-quartile-${number}`);
   if (!quartile) {
     return;
   }
 
-  quartile.innerHTML = Math.floor(((value / total) * 10000) / 100) + "%";
-  quartile.title = value;
+  const percentage = total > 0 ? Math.floor(((value / total) * 10000) / 100) : 0;
+  quartile.innerHTML = `${label}<br/><strong>${value}</strong> attendees (${percentage}%)`;
+  quartile.title = `${label}: ${value} attendees`;
 }
 
-function getQuartilesFromAttendees(totalTime) {
-  const quartiles = { q1: 0, q2: 0, q3: 0, q4: 0 };
+function getRetentionCohorts({ attendees, start, end }) {
+  const rangeMs = end - start;
 
-  const parsedTime = teamsAttendanceManager.parseDuration(totalTime) / 60;
-  const interval = Math.floor(parsedTime / 4);
+  if (rangeMs <= 0) {
+    return { q1: 0, q2: 0, q3: 0, q4: 0 };
+  }
 
-  quartiles.q1 =
-    teamsAttendanceManager.getAttendeesOverXMinutes(interval).length;
-  quartiles.q2 = teamsAttendanceManager.getAttendeesOverXMinutes(
-    interval * 2,
-  ).length;
-  quartiles.q3 = teamsAttendanceManager.getAttendeesOverXMinutes(
-    interval * 3,
-  ).length;
-  quartiles.q4 = teamsAttendanceManager.getAttendeesOverXMinutes(
-    interval * 4,
-  ).length;
+  return attendees.reduce(
+    (acc, attendee) => {
+      const overlap = teamsAttendanceManager.getAttendeeOverlapInRange({
+        attendee,
+        start,
+        end,
+      });
+      const ratio = overlap / rangeMs;
 
-  return quartiles;
+      if (ratio <= 0.25) {
+        acc.q1 += 1;
+      } else if (ratio <= 0.5) {
+        acc.q2 += 1;
+      } else if (ratio <= 0.75) {
+        acc.q3 += 1;
+      } else {
+        acc.q4 += 1;
+      }
+
+      return acc;
+    },
+    { q1: 0, q2: 0, q3: 0, q4: 0 },
+  );
 }
 
-function fillDistributionChart({ attendees, totalTime }) {
-  const { q1, q2, q3, q4 } = getQuartilesFromAttendees(totalTime);
-
-  console.log({ q1, q2, q3, q4 });
+function fillDistributionChart({ attendees, start, end }) {
+  const { q1, q2, q3, q4 } = getRetentionCohorts({ attendees, start, end });
   const total = attendees.length;
 
   setDistributionQuartileValue({
+    label: "0-25% stay",
     value: q1,
     number: 1,
     total,
   });
   setDistributionQuartileValue({
+    label: "25-50% stay",
     value: q2,
     number: 2,
     total,
   });
   setDistributionQuartileValue({
+    label: "50-75% stay",
     value: q3,
     number: 3,
     total,
   });
   setDistributionQuartileValue({
+    label: "75-100% stay",
     value: q4,
     number: 4,
     total,
   });
 }
 
+function getSeriesAverage(data) {
+  if (data.length === 0) {
+    return 0;
+  }
+
+  return data.reduce((acc, point) => acc + point.y, 0) / data.length;
+}
+
+function getMovingAverage(data, index, windowSize) {
+  const start = Math.max(0, index - windowSize + 1);
+  const window = data.slice(start, index + 1);
+
+  return getSeriesAverage(window);
+}
+
+function getTrendLabel({ currentAverage, previousAverage }) {
+  const delta = currentAverage - previousAverage;
+  if (delta > 0.1) {
+    return "up";
+  }
+
+  if (delta < -0.1) {
+    return "down";
+  }
+
+  return "flat";
+}
+
+function detectCriticalMoments(data, threshold = CRITICAL_DROP_THRESHOLD) {
+  const moments = [];
+
+  for (let index = 1; index < data.length; index++) {
+    const previous = data[index - 1];
+    const current = data[index];
+
+    if (previous.y <= 0) {
+      continue;
+    }
+
+    const drop = (previous.y - current.y) / previous.y;
+    if (drop >= threshold) {
+      moments.push({
+        x: new Date(current.x).getTime(),
+        drop,
+      });
+    }
+  }
+
+  return moments;
+}
+
+function getCriticalMomentLines(data) {
+  return detectCriticalMoments(data).map((moment) => ({
+    color: "#c64747",
+    width: 1,
+    dashStyle: "ShortDot",
+    zIndex: 3,
+    value: moment.x,
+    label: {
+      text: `-${Math.round(moment.drop * 100)}%`,
+      align: "left",
+      x: 4,
+      style: {
+        color: "#8f2222",
+        fontSize: "10px",
+      },
+    },
+  }));
+}
+
+function updateDashboardForRange({ start, end }) {
+  const attendees = teamsAttendanceManager.getAttendeesBetweenDates({
+    start,
+    end,
+  });
+  teamsAttendanceManager.setClipboardAttendees(attendees);
+
+  const input = document.getElementById("attendeesDurationInput");
+  input.dispatchEvent(new Event("input"));
+
+  const stats = teamsAttendanceManager.getGeneralStatsFromAttendeesInRange({
+    attendees,
+    start,
+    end,
+  });
+
+  fillGeneralStats(stats);
+  fillDistributionChart({ attendees, start, end });
+}
+
 function buildGraph(data) {
+  const meetingAverage = getSeriesAverage(data);
+  const criticalMomentLines = getCriticalMomentLines(data);
+
   const chart = Highcharts.chart("graphView", {
     chart: {
       type: "area",
@@ -824,14 +946,32 @@ function buildGraph(data) {
       enabled: true,
       shared: true,
       formatter: function () {
-        const point = this.point;
+        const point = this.points?.[0]?.point || this.point;
+        const pointIndex = point.index;
+        const previousPoint = pointIndex > 0 ? data[pointIndex - 1] : null;
         const moment = Highcharts.dateFormat("%Y-%m-%d %H:%M:%S", point.x);
-        const retention = (
-          (point.y / teamsAttendanceManager.generalStats.totalAttendees) *
-          100
-        ).toFixed(2);
+        const totalAttendees = teamsAttendanceManager.generalStats.totalAttendees || 1;
+        const retention = ((point.y / totalAttendees) * 100).toFixed(2);
+        const deltaPrevious = previousPoint ? point.y - previousPoint.y : 0;
+        const movingAverage = getMovingAverage(
+          data,
+          pointIndex,
+          TOOLTIP_MOVING_AVERAGE_WINDOW,
+        );
+        const previousMovingAverage = getMovingAverage(
+          data,
+          Math.max(0, pointIndex - 1),
+          TOOLTIP_MOVING_AVERAGE_WINDOW,
+        );
+        const trend = getTrendLabel({
+          currentAverage: movingAverage,
+          previousAverage: previousMovingAverage,
+        });
+        const deltaVsMeetingAverage = point.y - meetingAverage;
+        const deltaPrefix = deltaPrevious >= 0 ? "+" : "";
+        const meanPrefix = deltaVsMeetingAverage >= 0 ? "+" : "";
 
-        return `${moment}<br/><strong>${point.y}</strong> attendees | <strong>${retention}</strong>% of retention`;
+        return `${moment}<br/><strong>${point.y}</strong> attendees | <strong>${retention}</strong>% retention<br/>Delta vs previous: <strong>${deltaPrefix}${deltaPrevious}</strong><br/>Delta vs meeting avg: <strong>${meanPrefix}${deltaVsMeetingAverage.toFixed(2)}</strong><br/>5-point trend: <strong>${trend}</strong> (${movingAverage.toFixed(2)} avg)`;
       },
     },
     title: {
@@ -839,6 +979,7 @@ function buildGraph(data) {
     },
     xAxis: {
       type: "datetime",
+      plotLines: criticalMomentLines,
       title: {
         text: "Time",
       },
@@ -855,34 +996,7 @@ function buildGraph(data) {
             end = new Date(e.max);
           }
 
-          const attendees = teamsAttendanceManager.getAttendeesBetweenDates({
-            start,
-            end,
-          });
-          teamsAttendanceManager.setClipboardAttendees(attendees);
-
-          console.log("Asistentes en el rango de fechas:", {
-            start,
-            end,
-            attendees,
-            atStart: teamsAttendanceManager.getAttendeesAtPointInTime(start),
-          });
-
-          const input = document.getElementById("attendeesDurationInput");
-          input.dispatchEvent(new Event("input"));
-
-          const generalStats =
-            teamsAttendanceManager.getGeneralStatsFromAttendeesInRange({
-              attendees,
-              start,
-              end,
-            });
-
-          fillGeneralStats(generalStats);
-          fillDistributionChart({
-            attendees,
-            totalTime: generalStats.totalTime,
-          });
+          updateDashboardForRange({ start, end });
         },
       },
     },
@@ -973,6 +1087,13 @@ function fillGeneralStats(generalStats) {
     generalStats.totalReactions;
   document.querySelector(".participants-reacted .stat-value").textContent =
     generalStats.participantsReacted;
+
+  document.getElementById("summaryTotalAttendees").textContent =
+    generalStats.totalAttendees;
+  document.getElementById("summaryAverageRetention").textContent =
+    generalStats.averageRetention;
+  document.getElementById("summaryTotalTime").textContent =
+    generalStats.totalTime;
 }
 
 function decodeFileContent(arrayBuffer) {
@@ -1033,10 +1154,10 @@ dropArea.addEventListener("drop", (e) => {
     buildGraph(timeseries);
     prepareAttendeesDurationQuestion();
     prepareTimeResolutionSelector();
-    fillGeneralStats(teamsAttendanceManager.generalStats);
-    fillDistributionChart({
-      attendees: teamsAttendanceManager.attendees,
-      totalTime: teamsAttendanceManager.generalStats.totalTime,
+    const attendeesRange = teamsAttendanceManager.getAttendeesRange();
+    updateDashboardForRange({
+      start: attendeesRange.start,
+      end: attendeesRange.end,
     });
   };
 
