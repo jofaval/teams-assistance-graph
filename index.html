@@ -46,6 +46,15 @@
             aria-label="Filter attendees over X minutes"
           />
 
+          <div class="attendees-duration-result" aria-live="polite"></div>
+
+          <button
+            id="copyAttendeesOverXMinutesClipboard"
+            aria-label="Copy attendees over selected minutes"
+          >
+            📋
+          </button>
+
           <select
             id="timeResolution"
             title="Timeline resolution"
@@ -54,14 +63,28 @@
             <option value="minute" selected>Per minute</option>
             <option value="second">Per second</option>
           </select>
+        </div>
 
-          <div class="attendees-duration-result" aria-live="polite"></div>
-
+        <div class="time-range-selector" id="timeRangeSelector">
+          <input
+            type="time"
+            id="timeStart"
+            aria-label="Analysis start time"
+            title="Analysis start time (HH:MM)"
+          />
+          <span class="time-range-separator">–</span>
+          <input
+            type="time"
+            id="timeEnd"
+            aria-label="Analysis end time"
+            title="Analysis end time (HH:MM)"
+          />
           <button
-            id="copyAttendeesOverXMinutesClipboard"
-            aria-label="Copy attendees over selected minutes"
+            id="resetTimeRange"
+            aria-label="Reset analysis time range"
+            type="button"
           >
-            📋
+            Reset time
           </button>
         </div>
       </nav>
@@ -120,7 +143,28 @@
         </div>
       </aside>
 
-      <section id="distribution-chart">
+      <div id="distributionToggle" class="distribution-controls" role="group" aria-label="Distribution view selector">
+        <button
+          id="toggleRetentionMilestones"
+          class="toggle-button active"
+          type="button"
+          data-view="milestones"
+          aria-pressed="true"
+        >
+          Retention milestones
+        </button>
+        <button
+          id="toggleStayDistribution"
+          class="toggle-button"
+          type="button"
+          data-view="distribution"
+          aria-pressed="false"
+        >
+          Stay distribution
+        </button>
+      </div>
+
+      <section id="distribution-chart" data-view="milestones">
         <div id="distribution-quartile-1" class="distribution-quartile"></div>
 
         <div id="distribution-quartile-2" class="distribution-quartile"></div>

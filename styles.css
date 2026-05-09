@@ -15,6 +15,7 @@ body {
   position: fixed;
   top: 0;
   left: 0;
+  z-index: 30;
   width: 100%;
   height: 100%;
   background: linear-gradient(145deg, #ffffff, #e6e6e6);
@@ -50,6 +51,10 @@ header {
   z-index: 20;
   padding: 1rem 1.25rem 0.75rem;
   backdrop-filter: blur(4px);
+}
+
+body.drop-area-active header {
+  backdrop-filter: none;
 }
 
 nav {
@@ -107,6 +112,7 @@ nav {
   border: none;
   border-radius: 10px;
   padding: 10px;
+  padding-right: 28px;
   font-size: 14px;
   box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   transition: background-color 0.3s ease;
@@ -142,12 +148,12 @@ nav {
   min-height: 0;
   padding: 0 1.25rem 1rem;
   display: grid;
-  grid-template-rows: minmax(320px, 1fr) auto auto;
+  grid-template-rows: minmax(240px, 1fr) auto auto;
   gap: 0.8rem;
 }
 
 #graphView {
-  min-height: 320px;
+  min-height: 240px;
   width: 100%;
   border-radius: 16px;
   background: linear-gradient(180deg, #fefeff 0%, #f7fbff 100%);
@@ -208,13 +214,17 @@ nav {
 }
 
 #generalStats .stat-featured {
-  background: linear-gradient(130deg, #2f4f98, #17639f);
-  min-height: 66px;
+  background: linear-gradient(130deg, #4252a8, #355894);
 }
 
 #generalStats .stat-featured .stat-value {
-  font-size: 1.42rem;
+  font-size: 1.1rem;
   line-height: 1;
+}
+
+#generalStats .retention-percentage .stat-value {
+  font-weight: 900;
+  font-size: 1.25rem;
 }
 
 #generalStats .stat:hover {
@@ -232,9 +242,92 @@ nav {
 #copyAttendeesOverXMinutesClipboard:focus-visible,
 #attendeesDurationInput:focus-visible,
 #timeResolution:focus-visible,
-#generalStats .stat:focus-visible {
+#generalStats .stat:focus-visible,
+.toggle-button:focus-visible,
+.time-range-selector input:focus-visible {
   outline: 3px solid #0a84ff;
   outline-offset: 2px;
+}
+
+.time-range-selector {
+  display: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.time-range-selector input {
+  background-color: #f4f8fc;
+  border: none;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
+  transition: background-color 0.3s ease;
+  font-family: "IBM Plex Sans", sans-serif;
+}
+
+.time-range-selector input:hover {
+  background-color: #e5eef8;
+}
+
+.time-range-separator {
+  color: #43567b;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0 0.25rem;
+}
+
+#resetTimeRange {
+  background-color: #f4f8fc;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "Space Grotesk", sans-serif;
+  box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+#resetTimeRange:hover {
+  background-color: #e5eef8;
+  transform: translateY(-1px);
+}
+
+#resetTimeRange:focus-visible {
+  outline: 3px solid #0a84ff;
+  outline-offset: 2px;
+}
+
+.distribution-controls {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.toggle-button {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(43, 68, 116, 0.2);
+  color: #1e3660;
+  border-radius: 9px;
+  padding: 0.48rem 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: "Space Grotesk", sans-serif;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.toggle-button:hover {
+  transform: translateY(-1px);
+}
+
+.toggle-button.active {
+  background: linear-gradient(130deg, #2f4f98, #17639f);
+  border-color: transparent;
+  color: #f4fbff;
 }
 
 #distribution-chart {
@@ -256,12 +349,44 @@ nav {
   font-weight: 600;
 }
 
-#distribution-quartile-1 {
+.distribution-title {
+  display: inline-block;
+  margin-bottom: 0.22rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+  opacity: 0.92;
+}
+
+#distribution-chart[data-view="milestones"] #distribution-quartile-1 {
   background-color: #0070ad;
 }
 
-#distribution-quartile-2 {
+#distribution-chart[data-view="milestones"] #distribution-quartile-2 {
   background-color: #12abdb;
+}
+
+#distribution-chart[data-view="milestones"] #distribution-quartile-3 {
+  background-color: #338091;
+}
+
+#distribution-chart[data-view="milestones"] #distribution-quartile-4 {
+  background-color: #14596b;
+}
+
+#distribution-chart[data-view="distribution"] #distribution-quartile-1 {
+  background-color: #875f21;
+}
+
+#distribution-chart[data-view="distribution"] #distribution-quartile-2 {
+  background-color: #a5762c;
+}
+
+#distribution-chart[data-view="distribution"] #distribution-quartile-3 {
+  background-color: #bb8f43;
+}
+
+#distribution-chart[data-view="distribution"] #distribution-quartile-4 {
+  background-color: #d4a85b;
 }
 
 @media (max-width: 900px) {
@@ -298,12 +423,4 @@ nav {
   #attendeesDurationInput {
     min-width: 150px;
   }
-}
-
-#distribution-quartile-3 {
-  background-color: #338091;
-}
-
-#distribution-quartile-4 {
-  background-color: #14596B;
 }

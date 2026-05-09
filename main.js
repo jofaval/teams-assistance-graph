@@ -458,13 +458,19 @@ class TeamsAttendance {
     return needle >= start && needle <= end;
   }
 
-  getAttendeesAsTimeSeries(resolution = "minute") {
+  getAttendeesAsTimeSeries(resolution = "minute", rangeStart = null, rangeEnd = null) {
     const entries = this.getTimelineEntries();
     if (entries.length === 0) {
       return [];
     }
 
-    const { start, end } = this.getTimeSeriesConstraints(entries);
+    let { start, end } = this.getTimeSeriesConstraints(entries);
+
+    // Si se proporciona un rango personalizado, ajustar los límites
+    if (rangeStart && rangeEnd) {
+      start = new Date(Math.max(start.getTime(), rangeStart.getTime()));
+      end = new Date(Math.min(end.getTime(), rangeEnd.getTime()));
+    }
 
     const stepMs = resolution === "second" ? 1_000 : 60_000;
     const interval = Math.floor((end.getTime() - start.getTime()) / stepMs);
@@ -653,6 +659,10 @@ class TeamsAttendance {
 let teamsAttendanceManager;
 const CRITICAL_DROP_THRESHOLD = 0.2;
 const TOOLTIP_MOVING_AVERAGE_WINDOW = 5;
+const DISTRIBUTION_VIEW = {
+  MILESTONES: "milestones",
+  DISTRIBUTION: "distribution",
+};
 
 const dropArea = document.getElementById("dropArea");
 const dropAreaView = document.getElementById("dropAreaView");
@@ -665,8 +675,12 @@ const attendeesDurationArea = document.querySelector(
 const attendeesDurationResult = document.querySelector(
   ".attendees-duration-result",
 );
+const timeRangeSelector = document.getElementById("timeRangeSelector");
+const distributionToggle = document.getElementById("distributionToggle");
 const distributionChart = document.querySelector("#distribution-chart");
 const executiveSummary = document.getElementById("executiveSummary");
+let currentDistributionView = DISTRIBUTION_VIEW.MILESTONES;
+let lastDistributionRange = null;
 
 bootstrap();
 
@@ -675,15 +689,20 @@ function bootstrap() {
   console.log({ teamsAttendanceManager });
   window.dev = { teamsAttendanceManager };
 
+  prepareDistributionToggle();
+
   enableDropArea();
 }
 
 function enableGraphView() {
+  document.body.classList.remove("drop-area-active");
   dropAreaView.style.display = "none";
   graphView.style.display = "block";
   attendeesDurationArea.style.display = "flex";
+  timeRangeSelector.style.display = "flex";
   executiveSummary.style.display = "grid";
   generalStats.style.display = "grid";
+  distributionToggle.style.display = "flex";
   distributionChart.style.display = "grid";
 }
 
@@ -692,12 +711,15 @@ function resetEventListeners(element) {
 }
 
 function enableDropArea() {
+  document.body.classList.add("drop-area-active");
   dropAreaView.style.display = "block";
   graphView.style.display = "none";
   graphView.innerHTML = "";
   attendeesDurationArea.style.display = "none";
+  timeRangeSelector.style.display = "none";
   executiveSummary.style.display = "none";
   generalStats.style.display = "none";
+  distributionToggle.style.display = "none";
   distributionChart.style.display = "none";
 
   const fileInput = document.getElementById("fileInput");
@@ -711,6 +733,12 @@ function enableDropArea() {
     document.getElementById("copyAttendeesOverXMinutesClipboard"),
   );
   resetEventListeners(document.getElementById("timeResolution"));
+  resetEventListeners(document.getElementById("timeStart"));
+  resetEventListeners(document.getElementById("timeEnd"));
+  resetEventListeners(document.getElementById("resetTimeRange"));
+
+  document.getElementById("timeStart").value = "";
+  document.getElementById("timeEnd").value = "";
 
   teamsAttendanceManager.reset();
 
@@ -721,6 +749,9 @@ function enableDropArea() {
   document.getElementById("summaryTotalAttendees").textContent = "...";
   document.getElementById("summaryAverageRetention").textContent = "...";
   document.getElementById("summaryTotalTime").textContent = "...";
+
+  setDistributionView(DISTRIBUTION_VIEW.MILESTONES, { render: false });
+  lastDistributionRange = null;
 }
 
 function getTimelineResolution() {
@@ -728,17 +759,57 @@ function getTimelineResolution() {
   return selector?.value === "second" ? "second" : "minute";
 }
 
+function getTimeRange() {
+  const startInput = document.getElementById("timeStart");
+  const endInput = document.getElementById("timeEnd");
+
+  const startValue = startInput?.value;
+  const endValue = endInput?.value;
+
+  if (!startValue || !endValue) {
+    return { start: null, end: null };
+  }
+
+  // Obtener la fecha base del rango de asistentes actual
+  const attendeesRange = teamsAttendanceManager.getAttendeesRange();
+  const baseDate = attendeesRange.start;
+
+  // Parsear HH:MM y crear objetos Date para hoy
+  const [startHours, startMinutes] = startValue.split(":").map(Number);
+  const [endHours, endMinutes] = endValue.split(":").map(Number);
+
+  const start = new Date(baseDate);
+  start.setHours(startHours, startMinutes, 0, 0);
+
+  const end = new Date(baseDate);
+  end.setHours(endHours, endMinutes, 59, 999);
+
+  // Validar que end no sea menor que start
+  if (end < start) {
+    console.warn("End time must be after start time");
+    return { start: null, end: null };
+  }
+
+  return { start, end };
+}
+
 function redrawGraphUsingSelectedResolution() {
+  const { start: rangeStart, end: rangeEnd } = getTimeRange();
   const timeseries = teamsAttendanceManager.getAttendeesAsTimeSeries(
     getTimelineResolution(),
+    rangeStart,
+    rangeEnd,
   );
 
   buildGraph(timeseries);
 
   const attendeesRange = teamsAttendanceManager.getAttendeesRange();
+  const finalStart = rangeStart || attendeesRange.start;
+  const finalEnd = rangeEnd || attendeesRange.end;
+
   updateDashboardForRange({
-    start: attendeesRange.start,
-    end: attendeesRange.end,
+    start: finalStart,
+    end: finalEnd,
   });
 }
 
@@ -751,32 +822,83 @@ function prepareTimeResolutionSelector() {
   });
 }
 
-function setDistributionQuartileValue({ label, value, number, total }) {
+function prepareTimeRangeSelector() {
+  const startInput = document.getElementById("timeStart");
+  const endInput = document.getElementById("timeEnd");
+  const resetButton = document.getElementById("resetTimeRange");
+
+  startInput?.addEventListener("change", () => {
+    redrawGraphUsingSelectedResolution();
+  });
+
+  endInput?.addEventListener("change", () => {
+    redrawGraphUsingSelectedResolution();
+  });
+
+  resetButton?.addEventListener("click", () => {
+    startInput.value = "";
+    endInput.value = "";
+    redrawGraphUsingSelectedResolution();
+  });
+}
+
+function setDistributionQuartileValue({ qLabel, label, value, number, total }) {
   const quartile = document.getElementById(`distribution-quartile-${number}`);
   if (!quartile) {
     return;
   }
 
   const percentage = total > 0 ? Math.floor(((value / total) * 10000) / 100) : 0;
-  quartile.innerHTML = `${label}<br/><strong>${value}</strong> attendees (${percentage}%)`;
-  quartile.title = `${label}: ${value} attendees`;
+  quartile.innerHTML = `<span class="distribution-title">${qLabel} - ${label}</span><br/><strong>${value}</strong> attendees (${percentage}%)`;
+  quartile.title = `${qLabel} - ${label}: ${value} attendees`;
 }
 
-function getRetentionCohorts({ attendees, start, end }) {
+function getAttendeePresenceRatio({ attendee, start, end }) {
   const rangeMs = end - start;
-
   if (rangeMs <= 0) {
-    return { q1: 0, q2: 0, q3: 0, q4: 0 };
+    return 0;
   }
 
+  const overlapMs = teamsAttendanceManager.getAttendeeOverlapInRange({
+    attendee,
+    start,
+    end,
+  });
+
+  return overlapMs / rangeMs;
+}
+
+function getRetentionMilestones({ attendees, start, end }) {
   return attendees.reduce(
     (acc, attendee) => {
-      const overlap = teamsAttendanceManager.getAttendeeOverlapInRange({
-        attendee,
-        start,
-        end,
-      });
-      const ratio = overlap / rangeMs;
+      const ratio = getAttendeePresenceRatio({ attendee, start, end });
+
+      if (ratio >= 0.25) {
+        acc.q1 += 1;
+      }
+
+      if (ratio >= 0.5) {
+        acc.q2 += 1;
+      }
+
+      if (ratio >= 0.75) {
+        acc.q3 += 1;
+      }
+
+      if (ratio >= 0.999) {
+        acc.q4 += 1;
+      }
+
+      return acc;
+    },
+    { q1: 0, q2: 0, q3: 0, q4: 0 },
+  );
+}
+
+function getStayDistribution({ attendees, start, end }) {
+  return attendees.reduce(
+    (acc, attendee) => {
+      const ratio = getAttendeePresenceRatio({ attendee, start, end });
 
       if (ratio <= 0.25) {
         acc.q1 += 1;
@@ -794,33 +916,76 @@ function getRetentionCohorts({ attendees, start, end }) {
   );
 }
 
-function fillDistributionChart({ attendees, start, end }) {
-  const { q1, q2, q3, q4 } = getRetentionCohorts({ attendees, start, end });
+function fillDistributionChart({ attendees, start, end, view }) {
+  const isMilestones = view === DISTRIBUTION_VIEW.MILESTONES;
+  const { q1, q2, q3, q4 } = isMilestones
+    ? getRetentionMilestones({ attendees, start, end })
+    : getStayDistribution({ attendees, start, end });
   const total = attendees.length;
 
   setDistributionQuartileValue({
-    label: "0-25% stay",
+    qLabel: "Q1",
+    label: isMilestones ? "25% reached" : "0-25% stay",
     value: q1,
     number: 1,
     total,
   });
   setDistributionQuartileValue({
-    label: "25-50% stay",
+    qLabel: "Q2",
+    label: isMilestones ? "50% reached" : "25-50% stay",
     value: q2,
     number: 2,
     total,
   });
   setDistributionQuartileValue({
-    label: "50-75% stay",
+    qLabel: "Q3",
+    label: isMilestones ? "75% reached" : "50-75% stay",
     value: q3,
     number: 3,
     total,
   });
   setDistributionQuartileValue({
-    label: "75-100% stay",
+    qLabel: "Q4",
+    label: isMilestones ? "100% reached" : "75-100% stay",
     value: q4,
     number: 4,
     total,
+  });
+}
+
+function setDistributionView(view, { render = true } = {}) {
+  currentDistributionView = view;
+  distributionChart.dataset.view = view;
+
+  const milestonesButton = document.getElementById("toggleRetentionMilestones");
+  const distributionButton = document.getElementById("toggleStayDistribution");
+  const isMilestones = view === DISTRIBUTION_VIEW.MILESTONES;
+
+  milestonesButton.classList.toggle("active", isMilestones);
+  distributionButton.classList.toggle("active", !isMilestones);
+  milestonesButton.setAttribute("aria-pressed", String(isMilestones));
+  distributionButton.setAttribute("aria-pressed", String(!isMilestones));
+
+  if (render && lastDistributionRange) {
+    fillDistributionChart({
+      attendees: lastDistributionRange.attendees,
+      start: lastDistributionRange.start,
+      end: lastDistributionRange.end,
+      view: currentDistributionView,
+    });
+  }
+}
+
+function prepareDistributionToggle() {
+  const milestonesButton = document.getElementById("toggleRetentionMilestones");
+  const distributionButton = document.getElementById("toggleStayDistribution");
+
+  milestonesButton.addEventListener("click", () => {
+    setDistributionView(DISTRIBUTION_VIEW.MILESTONES);
+  });
+
+  distributionButton.addEventListener("click", () => {
+    setDistributionView(DISTRIBUTION_VIEW.DISTRIBUTION);
   });
 }
 
@@ -899,6 +1064,8 @@ function updateDashboardForRange({ start, end }) {
     start,
     end,
   });
+  lastDistributionRange = { attendees, start, end };
+
   teamsAttendanceManager.setClipboardAttendees(attendees);
 
   const input = document.getElementById("attendeesDurationInput");
@@ -911,7 +1078,12 @@ function updateDashboardForRange({ start, end }) {
   });
 
   fillGeneralStats(stats);
-  fillDistributionChart({ attendees, start, end });
+  fillDistributionChart({
+    attendees,
+    start,
+    end,
+    view: currentDistributionView,
+  });
 }
 
 function buildGraph(data) {
@@ -1154,6 +1326,7 @@ dropArea.addEventListener("drop", (e) => {
     buildGraph(timeseries);
     prepareAttendeesDurationQuestion();
     prepareTimeResolutionSelector();
+    prepareTimeRangeSelector();
     const attendeesRange = teamsAttendanceManager.getAttendeesRange();
     updateDashboardForRange({
       start: attendeesRange.start,
