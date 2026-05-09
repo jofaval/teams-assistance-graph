@@ -683,6 +683,12 @@ let currentDistributionView = DISTRIBUTION_VIEW.MILESTONES;
 let lastDistributionRange = null;
 let currentChart = null;
 let currentTimeseries = [];
+let currentRangeContext = {
+  start: null,
+  end: null,
+  totalAttendees: 0,
+  averageAttendees: 0,
+};
 
 bootstrap();
 
@@ -754,6 +760,12 @@ function enableDropArea() {
 
   setDistributionView(DISTRIBUTION_VIEW.MILESTONES, { render: false });
   lastDistributionRange = null;
+  currentRangeContext = {
+    start: null,
+    end: null,
+    totalAttendees: 0,
+    averageAttendees: 0,
+  };
 }
 
 function getTimelineResolution() {
@@ -999,6 +1011,32 @@ function getSeriesAverage(data) {
   return data.reduce((acc, point) => acc + point.y, 0) / data.length;
 }
 
+function getPointsWithinRange({ data, start, end }) {
+  if (!Array.isArray(data) || data.length === 0 || !start || !end) {
+    return [];
+  }
+
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+
+  return data.filter((point) => point.x >= startMs && point.x <= endMs);
+}
+
+function updateRangeContext({ start, end, totalAttendees }) {
+  const pointsInRange = getPointsWithinRange({
+    data: currentTimeseries,
+    start,
+    end,
+  });
+
+  currentRangeContext = {
+    start,
+    end,
+    totalAttendees,
+    averageAttendees: getSeriesAverage(pointsInRange),
+  };
+}
+
 function getMovingAverage(data, index, windowSize) {
   const start = Math.max(0, index - windowSize + 1);
   const window = data.slice(start, index + 1);
@@ -1017,6 +1055,110 @@ function getTrendLabel({ currentAverage, previousAverage }) {
   }
 
   return "flat";
+}
+
+function getTrendMeta(trend) {
+  if (trend === "up") {
+    return {
+      text: "Up trend",
+      arrow: "&uarr;",
+      className: "is-up",
+    };
+  }
+
+  if (trend === "down") {
+    return {
+      text: "Down trend",
+      arrow: "&darr;",
+      className: "is-down",
+    };
+  }
+
+  return {
+    text: "Flat trend",
+    arrow: "&rarr;",
+    className: "is-flat",
+  };
+}
+
+function getSignedValue(value, digits = 0) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const normalizedValue = Math.abs(safeValue) < 0.001 ? 0 : safeValue;
+  const fixedValue = normalizedValue.toFixed(digits);
+
+  if (normalizedValue > 0) {
+    return `+${fixedValue}`;
+  }
+
+  return fixedValue;
+}
+
+function getDeltaClass(value) {
+  if (value > 0) {
+    return "is-up";
+  }
+
+  if (value < 0) {
+    return "is-down";
+  }
+
+  return "is-flat";
+}
+
+function getInstantRetentionPercentage({ attendeesAtPoint, totalAttendeesInRange }) {
+  if (!totalAttendeesInRange || totalAttendeesInRange <= 0) {
+    return 0;
+  }
+
+  return (attendeesAtPoint / totalAttendeesInRange) * 100;
+}
+
+function getTooltipContent({ point, pointIndex, data }) {
+  const previousPoint = pointIndex > 0 ? data[pointIndex - 1] : null;
+  const moment = Highcharts.dateFormat("%Y-%m-%d %H:%M:%S", point.x);
+  const totalAttendeesInRange = currentRangeContext.totalAttendees || 0;
+  const retention = getInstantRetentionPercentage({
+    attendeesAtPoint: point.y,
+    totalAttendeesInRange,
+  });
+  const deltaPrevious = previousPoint ? point.y - previousPoint.y : 0;
+  const movingAverage = getMovingAverage(
+    data,
+    pointIndex,
+    TOOLTIP_MOVING_AVERAGE_WINDOW,
+  );
+  const previousMovingAverage = getMovingAverage(
+    data,
+    Math.max(0, pointIndex - 1),
+    TOOLTIP_MOVING_AVERAGE_WINDOW,
+  );
+  const trend = getTrendLabel({
+    currentAverage: movingAverage,
+    previousAverage: previousMovingAverage,
+  });
+  const trendMeta = getTrendMeta(trend);
+  const deltaVsRangeAverage = point.y - (currentRangeContext.averageAttendees || 0);
+  const deltaPreviousClass = getDeltaClass(deltaPrevious);
+  const deltaRangeClass = getDeltaClass(deltaVsRangeAverage);
+
+  return `
+    <div class="tooltip-card">
+      <div class="tooltip-time">${moment}</div>
+      <div class="tooltip-main-row">
+        <div class="tooltip-main-value">${point.y}</div>
+        <div class="tooltip-main-caption">attendees</div>
+      </div>
+      <div class="tooltip-retention">${retention.toFixed(2)}% retention in visible range</div>
+      <div class="tooltip-trend ${trendMeta.className}">
+        <span class="tooltip-trend-arrow">${trendMeta.arrow}</span>
+        <span>${trendMeta.text}</span>
+      </div>
+      <div class="tooltip-deltas">
+        <span class="tooltip-delta ${deltaPreviousClass}">${getSignedValue(deltaPrevious)} vs prev</span>
+        <span class="tooltip-delta ${deltaRangeClass}">${getSignedValue(deltaVsRangeAverage, 2)} vs range avg</span>
+      </div>
+    </div>
+  `;
 }
 
 function detectCriticalMoments(data, threshold = CRITICAL_DROP_THRESHOLD) {
@@ -1079,6 +1221,12 @@ function updateDashboardForRange({ start, end }) {
     end,
   });
 
+  updateRangeContext({
+    start,
+    end,
+    totalAttendees: attendees.length,
+  });
+
   fillGeneralStats(stats);
   fillDistributionChart({
     attendees,
@@ -1090,7 +1238,6 @@ function updateDashboardForRange({ start, end }) {
 
 function buildGraph(data) {
   currentTimeseries = data;
-  const meetingAverage = getSeriesAverage(data);
   const criticalMomentLines = getCriticalMomentLines(data);
 
   if (currentChart) {
@@ -1125,33 +1272,12 @@ function buildGraph(data) {
     tooltip: {
       enabled: true,
       shared: true,
+      useHTML: true,
+      className: "attendance-tooltip",
       formatter: function () {
         const point = this.points?.[0]?.point || this.point;
         const pointIndex = point.index;
-        const previousPoint = pointIndex > 0 ? data[pointIndex - 1] : null;
-        const moment = Highcharts.dateFormat("%Y-%m-%d %H:%M:%S", point.x);
-        const totalAttendees = teamsAttendanceManager.generalStats.totalAttendees || 1;
-        const retention = ((point.y / totalAttendees) * 100).toFixed(2);
-        const deltaPrevious = previousPoint ? point.y - previousPoint.y : 0;
-        const movingAverage = getMovingAverage(
-          data,
-          pointIndex,
-          TOOLTIP_MOVING_AVERAGE_WINDOW,
-        );
-        const previousMovingAverage = getMovingAverage(
-          data,
-          Math.max(0, pointIndex - 1),
-          TOOLTIP_MOVING_AVERAGE_WINDOW,
-        );
-        const trend = getTrendLabel({
-          currentAverage: movingAverage,
-          previousAverage: previousMovingAverage,
-        });
-        const deltaVsMeetingAverage = point.y - meetingAverage;
-        const deltaPrefix = deltaPrevious >= 0 ? "+" : "";
-        const meanPrefix = deltaVsMeetingAverage >= 0 ? "+" : "";
-
-        return `${moment}<br/><strong>${point.y}</strong> attendees | <strong>${retention}</strong>% retention<br/>Delta vs previous: <strong>${deltaPrefix}${deltaPrevious}</strong><br/>Delta vs meeting avg: <strong>${meanPrefix}${deltaVsMeetingAverage.toFixed(2)}</strong><br/>5-point trend: <strong>${trend}</strong> (${movingAverage.toFixed(2)} avg)`;
+        return getTooltipContent({ point, pointIndex, data });
       },
     },
     title: {

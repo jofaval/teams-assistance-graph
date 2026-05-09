@@ -161,6 +161,112 @@ nav {
   overflow: hidden;
 }
 
+.attendance-tooltip .highcharts-label-box {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.attendance-tooltip .highcharts-tooltip text {
+  fill: transparent;
+}
+
+.tooltip-card {
+  min-width: 220px;
+  max-width: 280px;
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(18, 34, 61, 0.95), rgba(29, 51, 93, 0.96));
+  border: 1px solid rgba(159, 197, 255, 0.38);
+  box-shadow: 0 16px 28px rgba(8, 14, 31, 0.35);
+  color: #f3f9ff;
+  font-family: "IBM Plex Sans", sans-serif;
+}
+
+.tooltip-time {
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  color: rgba(223, 237, 255, 0.82);
+  margin-bottom: 0.34rem;
+}
+
+.tooltip-main-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.12rem;
+}
+
+.tooltip-main-value {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.tooltip-main-caption {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(202, 227, 255, 0.86);
+}
+
+.tooltip-retention {
+  margin-bottom: 0.34rem;
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: #d6ecff;
+}
+
+.tooltip-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.16rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.tooltip-trend-arrow {
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.tooltip-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.tooltip-delta {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.43rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.tooltip-trend.is-up,
+.tooltip-delta.is-up {
+  background: rgba(26, 170, 125, 0.2);
+  color: #9ef6cc;
+}
+
+.tooltip-trend.is-down,
+.tooltip-delta.is-down {
+  background: rgba(220, 94, 94, 0.22);
+  color: #ffc1c1;
+}
+
+.tooltip-trend.is-flat,
+.tooltip-delta.is-flat {
+  background: rgba(132, 164, 210, 0.24);
+  color: #d8e8ff;
+}
+
 #executiveSummary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -418,6 +524,20 @@ nav {
 
   #distribution-chart {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tooltip-card {
+    min-width: 190px;
+    max-width: 230px;
+    padding: 0.58rem 0.62rem;
+  }
+
+  .tooltip-main-value {
+    font-size: 1.35rem;
+  }
+
+  .tooltip-delta {
+    font-size: 0.68rem;
   }
 
   #attendeesDurationInput {
