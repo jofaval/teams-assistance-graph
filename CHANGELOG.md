@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-05-09
+
+### Modified
+
+- Redesigned the dashboard layout with a clearer executive summary, improved accessibility attributes, and responsive behavior for mobile.
+- Extended report parsing to support section-based extraction (participants, activities, interactions) with more robust date and duration handling.
+- Added timeline controls to analyze attendance by minute/second and by custom time range, keeping graph and KPIs synchronized.
+- Introduced richer engagement insights, including reactions metrics, dual distribution views, and enhanced tooltip/trend/critical-drop visualization.
+* Improved tooltip hover
+
+## 2026-05-08
+
+### Added
+
+* Stay distribution chart with quartiles and hover details
+* Critical drop visualization with a red line and hover details
+
+### Modified
+
+- New visual identity for the dashboard, with a more modern and clean design
+
 ## 2026-02-11
 
 ### Added
