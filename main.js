@@ -681,6 +681,8 @@ const distributionChart = document.querySelector("#distribution-chart");
 const executiveSummary = document.getElementById("executiveSummary");
 let currentDistributionView = DISTRIBUTION_VIEW.MILESTONES;
 let lastDistributionRange = null;
+let currentChart = null;
+let currentTimeseries = [];
 
 bootstrap();
 
@@ -1087,10 +1089,16 @@ function updateDashboardForRange({ start, end }) {
 }
 
 function buildGraph(data) {
+  currentTimeseries = data;
   const meetingAverage = getSeriesAverage(data);
   const criticalMomentLines = getCriticalMomentLines(data);
 
-  const chart = Highcharts.chart("graphView", {
+  if (currentChart) {
+    currentChart.destroy();
+    currentChart = null;
+  }
+
+  let chart = Highcharts.chart("graphView", {
     chart: {
       type: "area",
       events: {
@@ -1158,15 +1166,41 @@ function buildGraph(data) {
       events: {
         setExtremes: function (e) {
           let start, end;
+          const isReset = typeof e.min == "undefined" && typeof e.max == "undefined";
 
-          if (typeof e.min == "undefined" && typeof e.max == "undefined") {
+          if (isReset) {
             const attendeesRange = teamsAttendanceManager.getAttendeesRange();
             start = attendeesRange.start;
             end = attendeesRange.end;
+
+            const startInput = document.getElementById("timeStart");
+            const endInput = document.getElementById("timeEnd");
+            if (startInput) startInput.value = "";
+            if (endInput) endInput.value = "";
           } else {
             start = new Date(e.min);
             end = new Date(e.max);
+
+            const pad = (n) => String(n).padStart(2, "0");
+            const startHHMM = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+            const endHHMM = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+
+            const startInput = document.getElementById("timeStart");
+            const endInput = document.getElementById("timeEnd");
+            if (startInput) startInput.value = startHHMM;
+            if (endInput) endInput.value = endHHMM;
           }
+
+          const rangeStart = start.getTime();
+          const rangeEnd = end.getTime();
+          const visibleData = currentTimeseries.filter(
+            (point) => point.x >= rangeStart && point.x <= rangeEnd,
+          );
+          const newCriticalLines = getCriticalMomentLines(visibleData);
+          const axis = this;
+          setTimeout(() => {
+            axis.update({ plotLines: newCriticalLines }, true);
+          }, 0);
 
           updateDashboardForRange({ start, end });
         },
@@ -1193,6 +1227,7 @@ function buildGraph(data) {
   });
 
   chart.redraw();
+  currentChart = chart;
 }
 
 function copyToClipboard(text) {
