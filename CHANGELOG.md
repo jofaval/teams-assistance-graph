@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-05-26
+
+### Added
+
+- Added `AGENTS.md` with contributor procedure and changelog guidance.
+- New attendees list view in the dashboard (`index.html`): searchable, sortable table with duration presets, filter chips, and a restore/list toggle.
+- New UI elements: `restoreListButton`, filters bar and clipboard chip icon.
+- Utility functions: `debounce`, `computeTimeSeriesForAttendees`, `mapParticipantNameToIdentityKey`, `setHeaderHeightVar`, `fillAttendeesList`, and `prepareAttendeesListView`.
+
+### Modified
+
+- Translated Spanish UI strings and ARIA labels to English across `index.html` and `main.js`.
+- Improved attendee filtering and preset toggles, added a clear-all filters action and sync between presets and the input value.
+- Integrated attendees list with graph range selection; added responsive two-column layout handling and header height adjustments.
+- Console/debug messages switched to English and several internal methods refactored for clarity and reusability.
+
 ## 2026-05-09
 
 ### Modified
