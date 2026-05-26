@@ -1376,7 +1376,7 @@ function buildGraph(data) {
           const attendees = teamsAttendanceManager.getAttendeesAtPointInTime(
             event.xAxis[0].value,
           );
-          console.log("Asistentes en el momento:", attendees);
+          console.log("Attendees at time:", attendees);
           copyAttendeesToClipboard(attendees);
         },
       },
@@ -1481,7 +1481,7 @@ function buildGraph(data) {
 
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
-    console.log("Texto copiado al portapapeles:", text);
+    console.log("Text copied to clipboard:", text);
   });
 }
 
@@ -1499,12 +1499,12 @@ function prepareAttendeesDurationQuestion() {
   const input = document.getElementById("attendeesDurationInput");
 
   input.addEventListener("input", (e) => {
-    console.log(`Asistentes con duración mayor a ${e.target.value} minutos:`);
+    console.log(`Attendees with duration greater than ${e.target.value} minutes:`);
     const attendeesDurationOverX =
       teamsAttendanceManager.getAttendeesOverXMinutes(parseInt(e.target.value));
 
     console.log(
-      `Asistentes con duración mayor a ${e.target.value} minutos:`,
+      `Attendees with duration greater than ${e.target.value} minutes:`,
       attendeesDurationOverX,
     );
 
@@ -1606,13 +1606,13 @@ function updateToggleListButtonIcon(listVisible) {
   if (listVisible) {
     // List is visible → button action is to hide it (show eye-slash)
     toggleBtn.innerHTML = `<span class="toggle-icon" aria-hidden="true">${eyeSlashSvg}</span>`;
-    toggleBtn.setAttribute("aria-label", "Ocultar lista");
-    toggleBtn.title = "Ocultar lista";
+    toggleBtn.setAttribute("aria-label", "Hide list");
+    toggleBtn.title = "Hide list";
   } else {
     // List is hidden → button action is to show it (eye)
     toggleBtn.innerHTML = `<span class="toggle-icon" aria-hidden="true">${eyeSvg}</span>`;
-    toggleBtn.setAttribute("aria-label", "Mostrar lista");
-    toggleBtn.title = "Mostrar lista";
+    toggleBtn.setAttribute("aria-label", "Show list");
+    toggleBtn.title = "Show list";
   }
 }
 
@@ -1658,11 +1658,11 @@ function prepareAttendeesListView() {
       chip.className = "filter-chip";
       const label = document.createElement("span");
       label.className = "chip-label";
-      label.textContent = `Buscar: "${escapeHtml(q)}"`;
+      label.textContent = `Search: "${escapeHtml(q)}"`;
       chip.appendChild(label);
       const btn = document.createElement("button");
       btn.className = "chip-remove";
-      btn.setAttribute("aria-label", "Eliminar filtro búsqueda");
+      btn.setAttribute("aria-label", "Remove search filter");
       btn.textContent = "×";
       btn.addEventListener("click", () => {
         if (search) { search.value = ""; search.dispatchEvent(new Event("input")); }
@@ -1677,11 +1677,11 @@ function prepareAttendeesListView() {
       chip.className = "filter-chip";
       const label = document.createElement("span");
       label.className = "chip-label";
-      label.textContent = `Duración ≥ ${minVal}m`;
+      label.textContent = `Duration ≥ ${minVal}m`;
       chip.appendChild(label);
       const btn = document.createElement("button");
       btn.className = "chip-remove";
-      btn.setAttribute("aria-label", "Eliminar filtro duración");
+      btn.setAttribute("aria-label", "Remove duration filter");
       btn.textContent = "×";
       btn.addEventListener("click", () => {
         const topInput = document.getElementById("attendeesDurationInput");

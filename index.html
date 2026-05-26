@@ -41,17 +41,17 @@
           <div class="attendees-duration-result" aria-live="polite"></div>
 
           <label class="attendees-duration-label" for="attendeesDurationInput">
-            Han asistido a más de
+            Have attended more than
             <input
               type="number"
               name="attendeesDurationInput"
               id="attendeesDurationInput"
               class="filter-control"
               placeholder="0"
-              aria-label="Han asistido a más de X minutos"
+              aria-label="Have attended more than X minutes"
               min="0"
             />
-            minutos
+            minutes
           </label>
 
 
@@ -104,7 +104,7 @@
             Reset time
           </button>
         </div>
-        <button id="restoreListButton" class="hidden" aria-hidden="true" type="button">Mostrar lista</button>
+        <button id="restoreListButton" class="hidden" aria-hidden="true" type="button">Show list</button>
       </nav>
     </header>
 
@@ -112,7 +112,7 @@
       <section id="attendeesListView" class="list-view" aria-label="Attendees list">
         <div class="list-controls">
           <div class="search-wrapper">
-            <input type="search" id="attendeeSearch" class="filter-control search-input" placeholder="Buscar por nombre o email" aria-label="Buscar asistentes" />
+            <input type="search" id="attendeeSearch" class="filter-control search-input" placeholder="Search by name or email" aria-label="Search attendees" />
           </div>
 
           <div class="min-duration-control">
@@ -122,7 +122,7 @@
                 <path d="M12 7v5l3 3"></path>
               </svg>
             </span>
-            <div class="presets" role="group" aria-label="Presets duración">
+            <div class="presets" role="group" aria-label="Duration presets">
               <button type="button" data-min="1">1m</button>
               <button type="button" data-min="5">5m</button>
               <button type="button" data-min="10">10m</button>
@@ -130,7 +130,7 @@
             </div>
           </div>
 
-          <button id="toggleList" class="filter-icon-button" type="button" aria-label="Ocultar lista" title="Ocultar lista">
+          <button id="toggleList" class="filter-icon-button" type="button" aria-label="Hide list" title="Hide list">
             <span class="toggle-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
                 <path d="M2.06 12C3.88 7.1 7.64 4 12 4s8.12 3.1 9.94 8c-1.82 4.9-5.58 8-9.94 8S3.88 16.9 2.06 12z"></path>
@@ -144,9 +144,9 @@
           <table id="attendeesTable">
             <thead>
               <tr>
-                <th data-sort="name">Nombre <span class="sort-indicator" aria-hidden="true"></span></th>
-                <th data-sort="retention">% Retención <span class="sort-indicator" aria-hidden="true"></span></th>
-                <th data-sort="duration">Duración <span class="sort-indicator" aria-hidden="true"></span></th>
+                <th data-sort="name">Name <span class="sort-indicator" aria-hidden="true"></span></th>
+                <th data-sort="retention">Retention % <span class="sort-indicator" aria-hidden="true"></span></th>
+                <th data-sort="duration">Duration <span class="sort-indicator" aria-hidden="true"></span></th>
               </tr>
             </thead>
             <tbody></tbody>
