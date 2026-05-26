@@ -1,7 +1,15 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
   font-family: "IBM Plex Sans", sans-serif;
   background:
-    radial-gradient(circle at 20% 0%, rgba(18, 171, 219, 0.12), transparent 45%),
+    radial-gradient(
+      circle at 20% 0%,
+      rgba(18, 171, 219, 0.12),
+      transparent 45%
+    ),
     radial-gradient(circle at 85% 10%, rgba(80, 90, 201, 0.1), transparent 40%),
     #edf2f8;
   margin: 0;
@@ -13,6 +21,14 @@ body {
 
 :root {
   --header-height: 64px;
+  --accent: #17639f;
+  --accent-strong: #2f4f98;
+  --accent-contrast: #f4fbff;
+  --muted-bg: #f4f8fc;
+  --filter-radius: 10px;
+  --filter-padding: 10px 12px;
+  --filter-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
+  --focus-ring-color: #0a84ff;
 }
 
 .hidden {
@@ -28,7 +44,9 @@ body {
   height: 100%;
   background: linear-gradient(145deg, #ffffff, #e6e6e6);
   border-radius: 0;
-  box-shadow: inset 8px 8px 15px #d1d1d1, inset -8px -8px 15px #ffffff;
+  box-shadow:
+    inset 8px 8px 15px #d1d1d1,
+    inset -8px -8px 15px #ffffff;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -41,7 +59,9 @@ body {
 
 .drop-area.drag-over {
   background: linear-gradient(145deg, #e6e6e6, #ffffff);
-  box-shadow: inset 4px 4px 10px #d1d1d1, inset -4px -4px 10px #ffffff;
+  box-shadow:
+    inset 4px 4px 10px #d1d1d1,
+    inset -4px -4px 10px #ffffff;
 }
 
 .drop-area input[type="file"] {
@@ -83,7 +103,9 @@ nav {
   font-family: "Space Grotesk", sans-serif;
   box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition:
+    background-color 0.3s ease,
+    transform 0.2s ease;
 }
 
 #resetButton:hover,
@@ -104,15 +126,34 @@ nav {
   gap: 0.5rem;
 }
 
+.attendees-duration-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #43567b;
+  font-weight: 600;
+}
+
 #attendeesDurationInput {
   background-color: #f4f8fc;
   border: none;
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 8px;
   font-size: 14px;
   box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   transition: background-color 0.3s ease;
-  min-width: 185px;
+  min-width: 64px;
+  width: 64px;
+  text-align: center;
+}
+
+.small-number-input {
+  min-width: 64px;
+  width: 64px;
+  padding: 6px 8px;
+  text-align: center;
+  border-radius: 8px;
 }
 
 #timeResolution {
@@ -159,18 +200,17 @@ nav {
   grid-template-columns: 1fr;
   grid-template-rows: minmax(240px, 1fr) auto auto;
   gap: 0.8rem;
-  max-height: calc(100vh - var(--header-height));
+  height: calc(100vh - 70px) !important;
   overflow: auto;
 }
 
 /* Two-column dashboard: left = attendees list, right = content */
 #dashboard.two-columns {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 700px minmax(0, 1fr);
   grid-template-rows: 1fr;
   gap: 1rem;
   align-items: stretch;
-  height: 100%;
   min-height: 0;
 }
 
@@ -207,7 +247,11 @@ nav {
   max-width: 280px;
   padding: 0.65rem 0.7rem;
   border-radius: 12px;
-  background: linear-gradient(165deg, rgba(18, 34, 61, 0.95), rgba(29, 51, 93, 0.96));
+  background: linear-gradient(
+    165deg,
+    rgba(18, 34, 61, 0.95),
+    rgba(29, 51, 93, 0.96)
+  );
   border: 1px solid rgba(159, 197, 255, 0.38);
   box-shadow: 0 16px 28px rgba(8, 14, 31, 0.35);
   color: #f3f9ff;
@@ -341,7 +385,9 @@ nav {
   padding: 10px 8px;
   font-size: 20px;
   box-shadow: 0 8px 20px rgba(26, 42, 77, 0.18);
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition:
+    background-color 0.3s ease,
+    transform 0.2s ease;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -426,7 +472,9 @@ nav {
   font-family: "Space Grotesk", sans-serif;
   box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition:
+    background-color 0.3s ease,
+    transform 0.2s ease;
 }
 
 #resetTimeRange:hover {
@@ -449,7 +497,9 @@ nav {
   font-family: "Space Grotesk", sans-serif;
   box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition:
+    background-color 0.3s ease,
+    transform 0.2s ease;
 }
 
 #toggleSidebarButton:hover {
@@ -466,7 +516,9 @@ nav {
   font-weight: 600;
   box-shadow: 0 6px 14px rgba(26, 42, 77, 0.12);
   cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.15s ease;
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease;
 }
 
 #restoreListButton:hover {
@@ -490,7 +542,10 @@ nav {
   font-weight: 700;
   font-family: "Space Grotesk", sans-serif;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .toggle-button:hover {
@@ -501,6 +556,113 @@ nav {
   background: linear-gradient(130deg, #2f4f98, #17639f);
   border-color: transparent;
   color: #f4fbff;
+}
+
+/* --- Filter identity: unified styles for inputs, selects, toggle-buttons and chips --- */
+
+.filter-control,
+#attendeesDurationInput,
+#timeResolution,
+#attendeeSearch,
+#attendeeMinDuration {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--muted-bg);
+  border: 1px solid rgba(43, 68, 116, 0.06);
+  padding: var(--filter-padding);
+  border-radius: var(--filter-radius);
+  box-shadow: var(--filter-shadow);
+  font-size: 14px;
+  color: #142645;
+  transition:
+    background-color 0.18s ease,
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.filter-control::placeholder {
+  color: rgba(20, 40, 80, 0.35);
+}
+
+.filter-control:focus,
+.filter-control:focus-visible,
+#attendeesDurationInput:focus,
+#timeResolution:focus,
+#attendeeSearch:focus,
+#attendeeMinDuration:focus {
+  outline: 3px solid var(--focus-ring-color);
+  outline-offset: 2px;
+  box-shadow: 0 8px 20px rgba(23, 99, 159, 0.12);
+}
+
+/* Compact icon-like button for small actions */
+.filter-icon-button,
+.copy-button {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--muted-bg);
+  border: 1px solid rgba(43, 68, 116, 0.06);
+  box-shadow: var(--filter-shadow);
+}
+
+/* Filter chips: represent active filters/quick toggles */
+.filters-bar {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: 0.5rem;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(23, 99, 159, 0.06);
+  color: var(--accent-strong);
+  font-weight: 700;
+  border: 1px solid rgba(23, 99, 159, 0.08);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition:
+    background-color 0.12s ease,
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.filter-chip .chip-icon {
+  font-size: 0.95rem;
+  opacity: 0.95;
+}
+
+.filter-chip[aria-pressed="true"],
+.filter-chip.active {
+  background: linear-gradient(130deg, var(--accent-strong), var(--accent));
+  color: var(--accent-contrast);
+  box-shadow: 0 6px 18px rgba(23, 99, 159, 0.18);
+  transform: translateY(-1px);
+}
+
+/* Better visual for toggle buttons when pressed via aria attribute */
+.toggle-button[aria-pressed="true"],
+.toggle-button.active {
+  background: linear-gradient(130deg, var(--accent-strong), var(--accent));
+  border-color: transparent;
+  color: var(--accent-contrast);
+  box-shadow: 0 8px 20px rgba(23, 99, 159, 0.16);
+  transform: translateY(-1px);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .filter-control,
+  .filter-chip,
+  .toggle-button {
+    transition: none !important;
+  }
 }
 
 #distribution-chart {
@@ -608,7 +770,8 @@ nav {
   }
 
   #attendeesDurationInput {
-    min-width: 150px;
+    min-width: 64px;
+    width: 64px;
   }
 }
 
@@ -629,13 +792,111 @@ nav {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
   flex-wrap: wrap;
 }
 
+/* Min-duration control with clock icon and small display */
+.min-duration-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-direction: row;
+}
+
+.min-duration-control .clock-icon {
+  font-size: 16px;
+  opacity: 0.95;
+}
+
+.min-duration-control .min-duration-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.min-duration-control input[type="range"] {
+  width: 160px;
+  margin-left: 4px;
+  height: 6px;
+  border-radius: 6px;
+  -webkit-appearance: none;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    rgba(20, 36, 69, 0.12) 0%
+  );
+}
+
+.min-duration-control .presets {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.min-duration-control .presets button {
+  background-color: #f4f8fc;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.min-duration-control .presets button.active {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.min-duration-display {
+  background: #f4f8fc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 6px 14px rgba(26, 42, 77, 0.06);
+}
+
+.toggle-icon {
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-icon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+}
+
+.clock-icon svg,
+.chip-icon svg,
+.filter-icon-button svg,
+.filter-chip .chip-icon svg {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 #attendeeSearch,
-#attendeeMinDuration,
-#attendeeSort {
+#attendeeMinDuration {
   padding: 8px 10px;
   border-radius: 8px;
   border: none;
@@ -646,10 +907,13 @@ nav {
 
 #toggleList {
   background: #f4f8fc;
-  border: none;
-  padding: 8px 10px;
+  border: 1px solid rgba(43, 68, 116, 0.06);
+  padding: 6px 8px;
   border-radius: 8px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .list-table-wrapper {
@@ -680,6 +944,25 @@ nav {
   z-index: 1;
 }
 
+/* Make headers clearly interactive for sorting */
+#attendeesTable thead th {
+  cursor: pointer;
+}
+
+#attendeesTable thead th .sort-indicator {
+  margin-left: 8px;
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+
+#attendeesTable thead th.sort-asc .sort-indicator::after {
+  content: "▲";
+}
+
+#attendeesTable thead th.sort-desc .sort-indicator::after {
+  content: "▼";
+}
+
 #attendeesTable tbody td {
   padding: 10px 12px;
   border-top: 1px solid rgba(30, 50, 80, 0.03);
@@ -690,7 +973,83 @@ nav {
 }
 
 .list-row:hover {
-  background: linear-gradient(90deg, rgba(18,34,61,0.03), rgba(29,51,93,0.02));
+  background: linear-gradient(
+    90deg,
+    rgba(18, 34, 61, 0.03),
+    rgba(29, 51, 93, 0.02)
+  );
+}
+
+/* Sidebar attendee detail */
+.sidebar {
+  position: fixed;
+}
+
+/* Enable absolute positioning of the toggle (eye) inside the list container */
+.list-view {
+  position: relative;
+}
+
+/* Toggle (eye) button pinned to top-right of the attendees container */
+#toggleList {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4f8fc;
+  border: 1px solid rgba(43, 68, 116, 0.06);
+  border-radius: 8px;
+}
+
+/* Polished search input with icon */
+.search-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  opacity: 0.6;
+  font-size: 0.95rem;
+}
+
+.search-input {
+  padding-left: 36px;
+  min-width: 220px;
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.12s ease;
+}
+
+/* Collapsed left column: narrow sidebar but still present */
+/* Collapsed left column: narrow sidebar but still present */
+#dashboard.collapsed-left.two-columns {
+  grid-template-columns: 55px minmax(0, 1fr);
+}
+
+/* Hide the attendees table and filter controls (except the toggle button) when collapsed */
+#dashboard.collapsed-left .list-table-wrapper {
+  display: none;
+}
+
+#dashboard.collapsed-left .list-controls .search-wrapper,
+#dashboard.collapsed-left .list-controls .min-duration-control {
+  display: none;
+}
+
+#dashboard.collapsed-left .min-duration-control .presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 /* Sidebar attendee detail */
@@ -745,4 +1104,11 @@ nav {
   .sidebar.open {
     transform: translateY(0);
   }
+}
+
+.chip-remove {
+  border: none;
+  background: transparent;
+  color: var(--accent-strong);
+  cursor: pointer;
 }

@@ -38,25 +38,40 @@
         </button>
 
         <div class="attendees-duration-area">
-          <input
-            type="number"
-            name="attendeesDurationInput"
-            id="attendeesDurationInput"
-            placeholder="Attendees over X minutes"
-            aria-label="Filter attendees over X minutes"
-          />
-
           <div class="attendees-duration-result" aria-live="polite"></div>
+
+          <label class="attendees-duration-label" for="attendeesDurationInput">
+            Han asistido a más de
+            <input
+              type="number"
+              name="attendeesDurationInput"
+              id="attendeesDurationInput"
+              class="filter-control"
+              placeholder="0"
+              aria-label="Han asistido a más de X minutos"
+              min="0"
+            />
+            minutos
+          </label>
+
 
           <button
             id="copyAttendeesOverXMinutesClipboard"
+            class="filter-icon-button"
             aria-label="Copy attendees over selected minutes"
+            title="Copy attendees"
           >
-            📋
+            <span class="chip-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1"></rect>
+              </svg>
+            </span>
           </button>
 
           <select
             id="timeResolution"
+            class="filter-control"
             title="Timeline resolution"
             aria-label="Timeline resolution"
           >
@@ -64,6 +79,8 @@
             <option value="second">Per second</option>
           </select>
         </div>
+
+        <div class="filters-bar" id="filtersBar" aria-live="polite" aria-label="Active filters"></div>
 
         <div class="time-range-selector" id="timeRangeSelector">
           <input
@@ -87,7 +104,6 @@
             Reset time
           </button>
         </div>
-        <button id="toggleSidebarButton" aria-pressed="false" type="button">Detalles</button>
         <button id="restoreListButton" class="hidden" aria-hidden="true" type="button">Mostrar lista</button>
       </nav>
     </header>
@@ -95,23 +111,42 @@
     <main id="dashboard" class="two-columns">
       <section id="attendeesListView" class="list-view" aria-label="Attendees list">
         <div class="list-controls">
-          <input type="search" id="attendeeSearch" placeholder="Buscar por nombre o email" aria-label="Buscar asistentes" />
-          <input type="number" id="attendeeMinDuration" placeholder="Min duración (min)" aria-label="Duración mínima (min)" min="0" />
-          <select id="attendeeSort" aria-label="Ordenar asistentes">
-            <option value="name">Orden: Nombre</option>
-            <option value="duration">Orden: Duración</option>
-            <option value="retention">Orden: % Retención</option>
-          </select>
-          <button id="toggleList" type="button">Ocultar lista</button>
+          <div class="search-wrapper">
+            <input type="search" id="attendeeSearch" class="filter-control search-input" placeholder="Buscar por nombre o email" aria-label="Buscar asistentes" />
+          </div>
+
+          <div class="min-duration-control">
+            <span class="clock-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 3"></path>
+              </svg>
+            </span>
+            <div class="presets" role="group" aria-label="Presets duración">
+              <button type="button" data-min="1">1m</button>
+              <button type="button" data-min="5">5m</button>
+              <button type="button" data-min="10">10m</button>
+              <button type="button" data-min="30">30m</button>
+            </div>
+          </div>
+
+          <button id="toggleList" class="filter-icon-button" type="button" aria-label="Ocultar lista" title="Ocultar lista">
+            <span class="toggle-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true">
+                <path d="M2.06 12C3.88 7.1 7.64 4 12 4s8.12 3.1 9.94 8c-1.82 4.9-5.58 8-9.94 8S3.88 16.9 2.06 12z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </span>
+          </button>
         </div>
 
         <div class="list-table-wrapper">
           <table id="attendeesTable">
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>% Retención</th>
-                <th>Duración</th>
+                <th data-sort="name">Nombre <span class="sort-indicator" aria-hidden="true"></span></th>
+                <th data-sort="retention">% Retención <span class="sort-indicator" aria-hidden="true"></span></th>
+                <th data-sort="duration">Duración <span class="sort-indicator" aria-hidden="true"></span></th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -204,10 +239,7 @@
         </section>
       </div>
 
-      <div id="attendeeDetail" class="sidebar" aria-hidden="true">
-        <button id="closeAttendeeDetail" class="close-sidebar" aria-label="Cerrar detalle">×</button>
-        <div id="attendeeDetailContent" class="detail-content"></div>
-      </div>
+      <!-- Details sidebar removed: attendee clicks now filter the dataset to that attendee -->
     </main>
   </body>
 

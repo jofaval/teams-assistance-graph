@@ -264,26 +264,57 @@ class TeamsAttendance {
   }
 
   getReactionStats({ start, end, totalAttendees }) {
+    // By default, count all reactions in the provided time range.
+    // If `identityKeys` is provided (array of identityKey strings),
+    // only reactions whose participant maps to one of those identityKeys
+    // will be considered. This allows computing reaction KPIs scoped
+    // to a filtered set of attendees (e.g. a single selected participant).
+    const identityKeys = arguments[0]?.identityKeys || null;
+
     const reactionsInRange = this.reactionEvents.filter((reaction) => {
       if (!start || !end) {
         return true;
       }
 
-      return this.dateBetweenRange({
+      const inside = this.dateBetweenRange({
         start,
         end,
         needle: reaction.timestamp,
       });
+      if (!inside) return false;
+
+      if (identityKeys && Array.isArray(identityKeys) && identityKeys.length > 0) {
+        const mapped = this.mapParticipantNameToIdentityKey(reaction.participantName);
+        return identityKeys.includes(mapped);
+      }
+
+      return true;
     });
 
     const participantsReacted = new Set(
-      reactionsInRange.map((reaction) => reaction.participantName),
+      reactionsInRange
+        .map((reaction) => this.mapParticipantNameToIdentityKey(reaction.participantName))
+        .filter(Boolean),
     ).size;
 
     return {
       totalReactions: reactionsInRange.length,
       participantsReacted,
     };
+  }
+
+  mapParticipantNameToIdentityKey(participantName) {
+    if (!participantName) return "";
+    const key = String(participantName).toLowerCase().trim();
+
+    if (this.attendeesByKey && this.attendeesByKey.has(key)) return key;
+
+    for (const [k, attendee] of this.attendeesByKey) {
+      if ((attendee.participantName || "").toLowerCase().trim() === key) return k;
+      if ((attendee.email || "").toLowerCase().trim() === key) return k;
+    }
+
+    return key;
   }
 
   getValueFromGeneralStats(line) {
@@ -591,10 +622,12 @@ class TeamsAttendance {
     const totalAttendees = attendees.length;
     const unknownAttendees = this.generalStats.unknownAttendees;
     const totalWatchTime = this.parseTotalWatchHoursStat(attendees);
+    const identityKeys = (attendees || []).map((a) => a.identityKey).filter(Boolean);
     const reactionsStats = this.getReactionStats({
       start,
       end,
       totalAttendees,
+      identityKeys,
     });
 
     return {
@@ -681,6 +714,7 @@ const distributionChart = document.querySelector("#distribution-chart");
 const executiveSummary = document.getElementById("executiveSummary");
 let currentDistributionView = DISTRIBUTION_VIEW.MILESTONES;
 let lastDistributionRange = null;
+let previousDistributionRange = null;
 let currentChart = null;
 let currentTimeseries = [];
 let currentRangeContext = {
@@ -690,6 +724,9 @@ let currentRangeContext = {
   averageAttendees: 0,
 };
 let lastSelectedAttendee = null;
+// Current sorting state for attendees list (field, direction)
+// Expose on `window` so other code paths that reference `window.currentAttendeeSort` see the default.
+window.currentAttendeeSort = { field: "name", direction: "asc" };
 
 function setHeaderHeightVar() {
   const header = document.querySelector("header");
@@ -697,16 +734,56 @@ function setHeaderHeightVar() {
   document.documentElement.style.setProperty("--header-height", `${headerHeight}px`);
 
   // enforce max heights via inline styles to be robust across browsers
-  const dashboard = document.getElementById("dashboard");
-  if (dashboard) {
-    dashboard.style.maxHeight = `calc(100vh - ${headerHeight}px)`;
-  }
+  // dashboard height is enforced in CSS (always calc(100vh - 70px));
+  // do not modify `#dashboard` here to keep layout consistent.
 
   const sidebar = document.getElementById("attendeeDetail");
   if (sidebar) {
     sidebar.style.top = `${headerHeight}px`;
     sidebar.style.height = `calc(100vh - ${headerHeight}px)`;
   }
+}
+
+/**
+ * Compute a time series for an explicit list of attendees (handles segments).
+ * Returns an array of { x: Date, y: count } points.
+ */
+function computeTimeSeriesForAttendees(attendees, resolution = "minute", rangeStart = null, rangeEnd = null) {
+  const entries = [];
+
+  attendees.forEach((att) => {
+    if (att.segments && att.segments.length) {
+      att.segments.forEach((s) => entries.push({ start: new Date(s.start), end: new Date(s.end), identityKey: att.identityKey }));
+    } else if (att.start && att.end) {
+      entries.push({ start: new Date(att.start), end: new Date(att.end), identityKey: att.identityKey });
+    }
+  });
+
+  if (entries.length === 0) return [];
+
+  let start = entries.reduce((min, e) => (e.start < min ? e.start : min), entries[0].start);
+  let end = entries.reduce((max, e) => (e.end > max ? e.end : max), entries[0].end);
+
+  if (rangeStart && rangeEnd) {
+    start = new Date(Math.max(start.getTime(), rangeStart.getTime()));
+    end = new Date(Math.min(end.getTime(), rangeEnd.getTime()));
+  }
+
+  const stepMs = resolution === "second" ? 1000 : 60_000;
+  const interval = Math.max(0, Math.floor((end.getTime() - start.getTime()) / stepMs));
+
+  const timeSeries = [];
+  for (let index = 0; index <= interval; index++) {
+    const now = new Date(start.getTime() + index * stepMs);
+
+    const activeEntries = entries.filter(({ start: s, end: e }) => now >= s && now <= e);
+
+    const count = new Set(activeEntries.map((entry) => entry.identityKey)).size;
+
+    timeSeries.push({ x: now, y: count });
+  }
+
+  return timeSeries;
 }
 
 bootstrap();
@@ -717,7 +794,6 @@ function bootstrap() {
   window.dev = { teamsAttendanceManager };
 
   prepareDistributionToggle();
-  prepareSidebarToggle();
   setHeaderHeightVar();
   window.addEventListener('resize', debounce(() => setHeaderHeightVar(), 120));
 
@@ -738,8 +814,8 @@ function enableGraphView() {
   if (listView) listView.classList.remove("hidden");
   const restoreBtn = document.getElementById("restoreListButton");
   if (restoreBtn) restoreBtn.classList.add("hidden");
-  const toggleBtn = document.getElementById("toggleList");
-  if (toggleBtn) toggleBtn.textContent = "Ocultar lista";
+  // update icon state for the toggle list button
+  updateToggleListButtonIcon(true);
   const dashboard = document.getElementById("dashboard");
   if (dashboard) dashboard.classList.add("two-columns");
 }
@@ -1493,76 +1569,208 @@ function debounce(fn, wait = 200) {
   };
 }
 
-function prepareSidebarToggle() {
-  const btn = document.getElementById("toggleSidebarButton");
-  const sidebar = document.getElementById("attendeeDetail");
-  if (!btn) return;
+// prepareSidebarToggle removed: sidebar-based details replaced by single-attendee dataset filtering
 
-  btn.addEventListener("click", () => {
-    if (!sidebar) return;
-    const isOpen = sidebar.classList.contains("open");
-    if (isOpen) {
-      sidebar.classList.remove("open");
-      sidebar.setAttribute("aria-hidden", "true");
-      btn.setAttribute("aria-pressed", "false");
-    } else {
-      sidebar.classList.add("open");
-      sidebar.setAttribute("aria-hidden", "false");
-      btn.setAttribute("aria-pressed", "true");
-      // If there's a previously selected attendee, render its details
-      if (lastSelectedAttendee) {
-        const { start, end } = currentRangeContext.start && currentRangeContext.end ? currentRangeContext : teamsAttendanceManager.getAttendeesRange();
-        showAttendeeDetail(lastSelectedAttendee, { start, end });
-      } else {
-        const content = document.getElementById("attendeeDetailContent");
-        if (content) content.innerHTML = `<div class="meta">Selecciona un asistente en la lista para ver detalles.</div>`;
-      }
+/* Helpers for attendees list sorting and UI */
+function setAttendeeSort(field) {
+  if (!window.currentAttendeeSort) window.currentAttendeeSort = { field: "name", direction: "asc" };
+  if (window.currentAttendeeSort.field === field) {
+    window.currentAttendeeSort.direction = window.currentAttendeeSort.direction === "asc" ? "desc" : "asc";
+  } else {
+    window.currentAttendeeSort.field = field;
+    window.currentAttendeeSort.direction = field === "name" ? "asc" : "desc";
+  }
+  const sortSelect = document.getElementById("attendeeSort");
+  if (sortSelect) sortSelect.value = field;
+  updateHeaderSortIndicators();
+}
+
+function updateHeaderSortIndicators() {
+  const table = document.getElementById("attendeesTable");
+  if (!table) return;
+  table.querySelectorAll("thead th").forEach((th) => {
+    th.classList.remove("sort-asc", "sort-desc");
+    const field = th.dataset.sort;
+    if (field && window.currentAttendeeSort && window.currentAttendeeSort.field === field) {
+      th.classList.add(window.currentAttendeeSort.direction === "asc" ? "sort-asc" : "sort-desc");
     }
   });
 }
 
+function updateToggleListButtonIcon(listVisible) {
+  const toggleBtn = document.getElementById("toggleList");
+  if (!toggleBtn) return;
+  const eyeSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M2.06 12C3.88 7.1 7.64 4 12 4s8.12 3.1 9.94 8c-1.82 4.9-5.58 8-9.94 8S3.88 16.9 2.06 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+  const eyeSlashSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M2 2l20 20" /><path d="M17.94 17.94C16.12 20 13.18 21 12 21c-4.36 0-8.12-3.1-9.94-8C3.88 7.1 7.64 4 12 4c1.18 0 4 1 5.94 3.06" /></svg>';
+
+  if (listVisible) {
+    // List is visible → button action is to hide it (show eye-slash)
+    toggleBtn.innerHTML = `<span class="toggle-icon" aria-hidden="true">${eyeSlashSvg}</span>`;
+    toggleBtn.setAttribute("aria-label", "Ocultar lista");
+    toggleBtn.title = "Ocultar lista";
+  } else {
+    // List is hidden → button action is to show it (eye)
+    toggleBtn.innerHTML = `<span class="toggle-icon" aria-hidden="true">${eyeSvg}</span>`;
+    toggleBtn.setAttribute("aria-label", "Mostrar lista");
+    toggleBtn.title = "Mostrar lista";
+  }
+}
+
+function updateMinDurationDisplay(value) {
+  const display = document.querySelector(".min-duration-display");
+  if (!display) return;
+  const minutes = Number.isFinite(Number(value)) ? Number(value) : 0;
+  display.textContent = `${minutes}m`;
+}
+
 function prepareAttendeesListView() {
   const search = document.getElementById("attendeeSearch");
-  const minDuration = document.getElementById("attendeeMinDuration");
   const sortSelect = document.getElementById("attendeeSort");
   const toggleBtn = document.getElementById("toggleList");
   const closeBtn = document.getElementById("closeAttendeeDetail");
+  const filtersBar = document.getElementById("filtersBar");
+  const presets = document.querySelectorAll(".min-duration-control .presets button");
 
-  // Initialize toggle button label according to current visibility
-  const initialListView = document.getElementById("attendeesListView");
-  if (toggleBtn && initialListView) {
-    const isHidden = initialListView.classList.contains("hidden") || window.getComputedStyle(initialListView).display === "none";
-    toggleBtn.textContent = isHidden ? "Mostrar lista" : "Ocultar lista";
+  // Initialize toggle button label according to dashboard collapsed state
+  const dashboard = document.getElementById("dashboard");
+  const isCollapsed = dashboard && dashboard.classList.contains("collapsed-left");
+  updateToggleListButtonIcon(!isCollapsed);
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[c]));
+  }
+
+  function updateFiltersBar() {
+    if (!filtersBar) return;
+    filtersBar.innerHTML = "";
+    const q = (search?.value || "").trim();
+    const minVal = Number(document.getElementById("attendeesDurationInput")?.value || 0);
+
+    if (q) {
+      const chip = document.createElement("div");
+      chip.className = "filter-chip";
+      const label = document.createElement("span");
+      label.className = "chip-label";
+      label.textContent = `Buscar: "${escapeHtml(q)}"`;
+      chip.appendChild(label);
+      const btn = document.createElement("button");
+      btn.className = "chip-remove";
+      btn.setAttribute("aria-label", "Eliminar filtro búsqueda");
+      btn.textContent = "×";
+      btn.addEventListener("click", () => {
+        if (search) { search.value = ""; search.dispatchEvent(new Event("input")); }
+        updateFiltersBar();
+      });
+      chip.appendChild(btn);
+      filtersBar.appendChild(chip);
+    }
+
+    if (minVal > 0) {
+      const chip = document.createElement("div");
+      chip.className = "filter-chip";
+      const label = document.createElement("span");
+      label.className = "chip-label";
+      label.textContent = `Duración ≥ ${minVal}m`;
+      chip.appendChild(label);
+      const btn = document.createElement("button");
+      btn.className = "chip-remove";
+      btn.setAttribute("aria-label", "Eliminar filtro duración");
+      btn.textContent = "×";
+      btn.addEventListener("click", () => {
+        const topInput = document.getElementById("attendeesDurationInput");
+        if (topInput) { topInput.value = 0; topInput.dispatchEvent(new Event("input")); }
+        updateFiltersBar();
+      });
+      chip.appendChild(btn);
+      filtersBar.appendChild(chip);
+    }
+
+    if (filtersBar.children.length > 0) {
+      const clearAllBtn = document.createElement("button");
+      clearAllBtn.className = "filter-chip clear-all";
+      clearAllBtn.textContent = "Borrar todo";
+      clearAllBtn.addEventListener("click", () => {
+        if (search) { search.value = ""; search.dispatchEvent(new Event("input")); }
+        const topInput = document.getElementById("attendeesDurationInput");
+        if (topInput) { topInput.value = 0; topInput.dispatchEvent(new Event("input")); }
+        updateFiltersBar();
+      });
+      filtersBar.appendChild(clearAllBtn);
+    }
   }
 
   const onInputChange = debounce(() => {
     const attendees = lastDistributionRange?.attendees || [];
     const rangeStart = lastDistributionRange?.start;
     const rangeEnd = lastDistributionRange?.end;
+
+    // sincronizar estado 'active' de los botones presets con el valor del input
+    const currentVal = String(document.getElementById("attendeesDurationInput")?.value || "0");
+    if (presets && presets.length) {
+      presets.forEach((b) => {
+        if (String(b.dataset.min) === currentVal && currentVal !== "0") {
+          b.classList.add("active");
+        } else {
+          b.classList.remove("active");
+        }
+      });
+    }
+
     fillAttendeesList(attendees, { start: rangeStart, end: rangeEnd });
+    updateFiltersBar();
   }, 200);
 
   search?.addEventListener("input", onInputChange);
-  minDuration?.addEventListener("input", onInputChange);
-  sortSelect?.addEventListener("change", onInputChange);
+  const topDurationInput = document.getElementById("attendeesDurationInput");
+  topDurationInput?.addEventListener("input", onInputChange);
+
+  if (presets && presets.length) {
+    presets.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const val = String(btn.dataset.min);
+        const topInput = document.getElementById("attendeesDurationInput");
+        if (!topInput) return;
+
+        const current = String(topInput.value || "0");
+
+        // Si el preset ya está seleccionado, togglearlo (deseleccionar)
+        if (current === val) {
+          topInput.value = "0";
+          topInput.dispatchEvent(new Event("input"));
+          presets.forEach((b) => b.classList.remove("active"));
+          onInputChange();
+          return;
+        }
+
+        // Seleccionar nuevo preset
+        topInput.value = val;
+        topInput.dispatchEvent(new Event("input"));
+        presets.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        onInputChange();
+      });
+    });
+  }
+
+  sortSelect?.addEventListener("change", () => {
+    const val = sortSelect.value;
+    window.currentAttendeeSort = { field: val, direction: val === "name" ? "asc" : "desc" };
+    updateHeaderSortIndicators();
+    onInputChange();
+  });
 
   toggleBtn?.addEventListener("click", () => {
-    const listView = document.getElementById("attendeesListView");
-    if (!listView) return;
-    const nowHidden = listView.classList.toggle("hidden");
-    toggleBtn.textContent = nowHidden ? "Mostrar lista" : "Ocultar lista";
-    // show/hide the restore button in header
-    const restoreBtn = document.getElementById("restoreListButton");
-    if (restoreBtn) {
-      if (nowHidden) restoreBtn.classList.remove("hidden");
-      else restoreBtn.classList.add("hidden");
-    }
-    // switch dashboard columns
-    const dashboard = document.getElementById("dashboard");
-    if (dashboard) {
-      if (nowHidden) dashboard.classList.remove("two-columns");
-      else dashboard.classList.add("two-columns");
-    }
+    const dashboardEl = document.getElementById("dashboard");
+    if (!dashboardEl) return;
+    const nowCollapsed = dashboardEl.classList.toggle("collapsed-left");
+    updateToggleListButtonIcon(!nowCollapsed);
   });
 
   const restoreBtn = document.getElementById("restoreListButton");
@@ -1571,7 +1779,7 @@ function prepareAttendeesListView() {
     if (!listView) return;
     listView.classList.remove("hidden");
     restoreBtn.classList.add("hidden");
-    if (toggleBtn) toggleBtn.textContent = "Ocultar lista";
+    updateToggleListButtonIcon(true);
     const dashboard = document.getElementById("dashboard");
     if (dashboard) dashboard.classList.add("two-columns");
   });
@@ -1581,6 +1789,21 @@ function prepareAttendeesListView() {
     sidebar?.classList.remove("open");
     sidebar?.setAttribute("aria-hidden", "true");
   });
+
+  // Make table headers clickable to sort by column
+  const table = document.getElementById("attendeesTable");
+  if (table) {
+    const ths = table.querySelectorAll("thead th[data-sort]");
+    ths.forEach((th) => {
+      th.classList.add("clickable-sort");
+      th.addEventListener("click", () => {
+        const field = th.dataset.sort;
+        setAttendeeSort(field);
+        onInputChange();
+      });
+    });
+    updateHeaderSortIndicators();
+  }
 }
 
 function fillAttendeesList(attendees, { start, end } = {}) {
@@ -1588,8 +1811,8 @@ function fillAttendeesList(attendees, { start, end } = {}) {
   if (!tbody) return;
 
   const searchValue = (document.getElementById("attendeeSearch")?.value || "").toLowerCase();
-  const minDurationValue = parseFloat(document.getElementById("attendeeMinDuration")?.value || "0");
-  const sortValue = document.getElementById("attendeeSort")?.value || "name";
+  const minDurationValue = parseFloat(document.getElementById("attendeesDurationInput")?.value || "0");
+  const sortState = window.currentAttendeeSort || { field: document.getElementById("attendeeSort")?.value || "name", direction: "asc" };
 
   const filtered = (attendees || []).filter((attendee) => {
     if (!attendee) return false;
@@ -1603,23 +1826,29 @@ function fillAttendeesList(attendees, { start, end } = {}) {
     return true;
   });
 
-  filtered.sort((a,b) => {
-    if (sortValue === "name") {
-      return (a.participantName || "").localeCompare(b.participantName || "");
+  filtered.sort((a, b) => {
+    const field = sortState.field;
+    const dir = sortState.direction;
+    if (field === "name") {
+      const cmp = (a.participantName || "").localeCompare(b.participantName || "");
+      return dir === "asc" ? cmp : -cmp;
     }
-    if (sortValue === "duration") {
-      const da = a.durationSeconds != null ? a.durationSeconds : (a.end - a.start)/1000;
-      const db = b.durationSeconds != null ? b.durationSeconds : (b.end - b.start)/1000;
-      return db - da;
+    if (field === "duration") {
+      const da = a.durationSeconds != null ? a.durationSeconds : (a.end - a.start) / 1000;
+      const db = b.durationSeconds != null ? b.durationSeconds : (b.end - b.start) / 1000;
+      return dir === "asc" ? da - db : db - da;
     }
-    if (sortValue === "retention") {
+    if (field === "retention") {
       if (!start || !end) return 0;
-      const ra = teamsAttendanceManager.getAttendeeOverlapInRange({attendee:a, start, end}) ;
-      const rb = teamsAttendanceManager.getAttendeeOverlapInRange({attendee:b, start, end}) ;
-      return rb - ra;
+      const ra = teamsAttendanceManager.getAttendeeOverlapInRange({ attendee: a, start, end });
+      const rb = teamsAttendanceManager.getAttendeeOverlapInRange({ attendee: b, start, end });
+      return dir === "asc" ? ra - rb : rb - ra;
     }
     return 0;
   });
+
+  // reflect sorting UI state
+  updateHeaderSortIndicators();
 
   tbody.innerHTML = "";
 
@@ -1642,30 +1871,65 @@ function fillAttendeesList(attendees, { start, end } = {}) {
 }
 
 function showAttendeeDetail(attendee, { start, end } = {}) {
-  const sidebar = document.getElementById("attendeeDetail");
-  const content = document.getElementById("attendeeDetailContent");
-  if (!sidebar || !content || !attendee) return;
+  if (!attendee) return;
+
+  // Determine frame of reference (use current range if set)
+  const frameStart = currentRangeContext.start && currentRangeContext.end ? currentRangeContext.start : teamsAttendanceManager.getAttendeesRange().start;
+  const frameEnd = currentRangeContext.start && currentRangeContext.end ? currentRangeContext.end : teamsAttendanceManager.getAttendeesRange().end;
+
+  // If the same attendee is clicked again, restore previous (unfiltered) dataset
+  if (lastSelectedAttendee && attendee.identityKey === lastSelectedAttendee.identityKey) {
+    lastSelectedAttendee = null;
+
+    const restore = previousDistributionRange || { attendees: teamsAttendanceManager.attendees, start: teamsAttendanceManager.getAttendeesRange().start, end: teamsAttendanceManager.getAttendeesRange().end };
+
+    lastDistributionRange = restore;
+    teamsAttendanceManager.setClipboardAttendees(restore.attendees);
+
+    const timeseries = computeTimeSeriesForAttendees(restore.attendees, getTimelineResolution(), restore.start, restore.end);
+    buildGraph(timeseries);
+
+    const stats = teamsAttendanceManager.getGeneralStatsFromAttendeesInRange({ attendees: restore.attendees, start: restore.start, end: restore.end });
+    updateRangeContext({ start: restore.start, end: restore.end, totalAttendees: restore.attendees.length });
+
+    fillGeneralStats(stats);
+    fillDistributionChart({ attendees: restore.attendees, start: restore.start, end: restore.end, view: currentDistributionView });
+
+    try {
+      fillAttendeesList(restore.attendees, { start: restore.start, end: restore.end });
+    } catch (err) {
+      console.warn("Error filling attendees list:", err);
+    }
+
+    previousDistributionRange = null;
+
+    return;
+  }
+
+  // New attendee selection: backup current range then filter to this attendee
+  previousDistributionRange = lastDistributionRange ? { attendees: lastDistributionRange.attendees, start: lastDistributionRange.start, end: lastDistributionRange.end } : { attendees: teamsAttendanceManager.attendees, start: teamsAttendanceManager.getAttendeesRange().start, end: teamsAttendanceManager.getAttendeesRange().end };
 
   lastSelectedAttendee = attendee;
 
-  const overlapMs = start && end ? teamsAttendanceManager.getAttendeeOverlapInRange({ attendee, start, end }) : (attendee.durationSeconds != null ? attendee.durationSeconds*1000 : (attendee.end - attendee.start));
-  const retentionPct = start && end ? Math.floor((overlapMs / (end - start)) * 10000) / 100 : 0;
-  const durationSeconds = attendee.durationSeconds != null ? attendee.durationSeconds : Math.round((attendee.end - attendee.start)/1000);
-  const durationLabel = teamsAttendanceManager.formatTimeStat(teamsAttendanceManager.getHoursMinutesSeconds(durationSeconds));
+  const attendeesArray = [attendee];
 
-  const segmentsHtml = (attendee.segments || []).map(s => `<li>${new Date(s.start).toLocaleString()} → ${new Date(s.end).toLocaleString()}</li>`).join("");
-  const interactions = teamsAttendanceManager.interactionEvents.filter(ev => {
-    const norm = (ev.participantName || "").toLowerCase();
-    const name = (attendee.participantName || "").toLowerCase();
-    const email = (attendee.email || "").toLowerCase();
-    return norm === name || (email && norm.includes(email));
-  });
-  const reactions = interactions.filter(i => i.isReaction);
+  lastDistributionRange = { attendees: attendeesArray, start: frameStart, end: frameEnd };
+  teamsAttendanceManager.setClipboardAttendees(attendeesArray);
 
-  content.innerHTML = `\n    <h3>${attendee.participantName || "(sin nombre)"}</h3>\n    <div class="meta">${attendee.email || ""}</div>\n    <div><strong>Duración:</strong> ${durationLabel}</div>\n    <div><strong>Retención:</strong> ${retentionPct}%</div>\n    <div><strong>Segments:</strong><ul>${segmentsHtml}</ul></div>\n    <div><strong>Total interacciones:</strong> ${interactions.length}</div>\n    <div><strong>Total reacciones:</strong> ${reactions.length}</div>\n  `;
+  const timeseries = computeTimeSeriesForAttendees(attendeesArray, getTimelineResolution(), frameStart, frameEnd);
+  buildGraph(timeseries);
 
-  sidebar.classList.add("open");
-  sidebar.setAttribute("aria-hidden", "false");
+  const stats = teamsAttendanceManager.getGeneralStatsFromAttendeesInRange({ attendees: attendeesArray, start: frameStart, end: frameEnd });
+  updateRangeContext({ start: frameStart, end: frameEnd, totalAttendees: attendeesArray.length });
+
+  fillGeneralStats(stats);
+  fillDistributionChart({ attendees: attendeesArray, start: frameStart, end: frameEnd, view: currentDistributionView });
+
+  try {
+    fillAttendeesList(attendeesArray, { start: frameStart, end: frameEnd });
+  } catch (err) {
+    console.warn("Error filling attendees list:", err);
+  }
 }
 
 // Prevent default behavior for drag events
