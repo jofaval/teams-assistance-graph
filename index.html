@@ -87,92 +87,127 @@
             Reset time
           </button>
         </div>
+        <button id="toggleSidebarButton" aria-pressed="false" type="button">Detalles</button>
+        <button id="restoreListButton" class="hidden" aria-hidden="true" type="button">Mostrar lista</button>
       </nav>
     </header>
 
-    <main id="dashboard">
-      <section id="graphView"></section>
+    <main id="dashboard" class="two-columns">
+      <section id="attendeesListView" class="list-view" aria-label="Attendees list">
+        <div class="list-controls">
+          <input type="search" id="attendeeSearch" placeholder="Buscar por nombre o email" aria-label="Buscar asistentes" />
+          <input type="number" id="attendeeMinDuration" placeholder="Min duración (min)" aria-label="Duración mínima (min)" min="0" />
+          <select id="attendeeSort" aria-label="Ordenar asistentes">
+            <option value="name">Orden: Nombre</option>
+            <option value="duration">Orden: Duración</option>
+            <option value="retention">Orden: % Retención</option>
+          </select>
+          <button id="toggleList" type="button">Ocultar lista</button>
+        </div>
 
-      <section id="executiveSummary" aria-label="Executive summary metrics">
-        <article class="summary-item" aria-live="polite">
-          <span class="summary-label">Attendees in focus</span>
-          <span class="summary-value" id="summaryTotalAttendees">...</span>
-        </article>
-        <article class="summary-item" aria-live="polite">
-          <span class="summary-label">Average retention</span>
-          <span class="summary-value" id="summaryAverageRetention">...</span>
-        </article>
-        <article class="summary-item" aria-live="polite">
-          <span class="summary-label">Range duration</span>
-          <span class="summary-value" id="summaryTotalTime">...</span>
-        </article>
+        <div class="list-table-wrapper">
+          <table id="attendeesTable">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>% Retención</th>
+                <th>Duración</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
-      <aside id="generalStats" role="region" aria-live="polite" aria-label="Detailed meeting metrics">
-        <div class="stat total-attendees" title="Total attendees" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Total attendees</span>
-        </div>
-        <div class="stat unknown-attendees" title="Unknown attendees" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Unknown attendees</span>
-        </div>
-        <div class="stat average-retention stat-featured" title="Average retention" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Average retention</span>
-        </div>
-        <div class="stat retention-percentage" title="Retention percentage" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Retention percentage</span>
-        </div>
-        <div class="stat total-duration" title="Total duration" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Total duration</span>
-        </div>
-        <div class="stat total-watch-hours" title="Total watch hours" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Total watch hours</span>
-        </div>
-        <div class="stat total-reactions" title="Total reactions" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Total reactions</span>
-        </div>
-        <div class="stat participants-reacted" title="Participants reacted" tabindex="0">
-          <span class="stat-value">...</span>
-          <span class="stat-label">Participants reacted</span>
-        </div>
-      </aside>
+      <div class="dashboard-right">
+        <section id="graphView"></section>
 
-      <div id="distributionToggle" class="distribution-controls" role="group" aria-label="Distribution view selector">
-        <button
-          id="toggleRetentionMilestones"
-          class="toggle-button active"
-          type="button"
-          data-view="milestones"
-          aria-pressed="true"
-        >
-          Retention milestones
-        </button>
-        <button
-          id="toggleStayDistribution"
-          class="toggle-button"
-          type="button"
-          data-view="distribution"
-          aria-pressed="false"
-        >
-          Stay distribution
-        </button>
+        <section id="executiveSummary" aria-label="Executive summary metrics">
+          <article class="summary-item" aria-live="polite">
+            <span class="summary-label">Attendees in focus</span>
+            <span class="summary-value" id="summaryTotalAttendees">...</span>
+          </article>
+          <article class="summary-item" aria-live="polite">
+            <span class="summary-label">Average retention</span>
+            <span class="summary-value" id="summaryAverageRetention">...</span>
+          </article>
+          <article class="summary-item" aria-live="polite">
+            <span class="summary-label">Range duration</span>
+            <span class="summary-value" id="summaryTotalTime">...</span>
+          </article>
+        </section>
+
+        <aside id="generalStats" role="region" aria-live="polite" aria-label="Detailed meeting metrics">
+          <div class="stat total-attendees" title="Total attendees" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Total attendees</span>
+          </div>
+          <div class="stat unknown-attendees" title="Unknown attendees" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Unknown attendees</span>
+          </div>
+          <div class="stat average-retention stat-featured" title="Average retention" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Average retention</span>
+          </div>
+          <div class="stat retention-percentage" title="Retention percentage" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Retention percentage</span>
+          </div>
+          <div class="stat total-duration" title="Total duration" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Total duration</span>
+          </div>
+          <div class="stat total-watch-hours" title="Total watch hours" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Total watch hours</span>
+          </div>
+          <div class="stat total-reactions" title="Total reactions" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Total reactions</span>
+          </div>
+          <div class="stat participants-reacted" title="Participants reacted" tabindex="0">
+            <span class="stat-value">...</span>
+            <span class="stat-label">Participants reacted</span>
+          </div>
+        </aside>
+
+        <div id="distributionToggle" class="distribution-controls" role="group" aria-label="Distribution view selector">
+          <button
+            id="toggleRetentionMilestones"
+            class="toggle-button active"
+            type="button"
+            data-view="milestones"
+            aria-pressed="true"
+          >
+            Retention milestones
+          </button>
+          <button
+            id="toggleStayDistribution"
+            class="toggle-button"
+            type="button"
+            data-view="distribution"
+            aria-pressed="false"
+          >
+            Stay distribution
+          </button>
+        </div>
+
+        <section id="distribution-chart" data-view="milestones">
+          <div id="distribution-quartile-1" class="distribution-quartile"></div>
+
+          <div id="distribution-quartile-2" class="distribution-quartile"></div>
+
+          <div id="distribution-quartile-3" class="distribution-quartile"></div>
+
+          <div id="distribution-quartile-4" class="distribution-quartile"></div>
+        </section>
       </div>
 
-      <section id="distribution-chart" data-view="milestones">
-        <div id="distribution-quartile-1" class="distribution-quartile"></div>
-
-        <div id="distribution-quartile-2" class="distribution-quartile"></div>
-
-        <div id="distribution-quartile-3" class="distribution-quartile"></div>
-
-        <div id="distribution-quartile-4" class="distribution-quartile"></div>
-      </section>
+      <div id="attendeeDetail" class="sidebar" aria-hidden="true">
+        <button id="closeAttendeeDetail" class="close-sidebar" aria-label="Cerrar detalle">×</button>
+        <div id="attendeeDetailContent" class="detail-content"></div>
+      </div>
     </main>
   </body>
 

@@ -689,6 +689,25 @@ let currentRangeContext = {
   totalAttendees: 0,
   averageAttendees: 0,
 };
+let lastSelectedAttendee = null;
+
+function setHeaderHeightVar() {
+  const header = document.querySelector("header");
+  const headerHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty("--header-height", `${headerHeight}px`);
+
+  // enforce max heights via inline styles to be robust across browsers
+  const dashboard = document.getElementById("dashboard");
+  if (dashboard) {
+    dashboard.style.maxHeight = `calc(100vh - ${headerHeight}px)`;
+  }
+
+  const sidebar = document.getElementById("attendeeDetail");
+  if (sidebar) {
+    sidebar.style.top = `${headerHeight}px`;
+    sidebar.style.height = `calc(100vh - ${headerHeight}px)`;
+  }
+}
 
 bootstrap();
 
@@ -698,6 +717,9 @@ function bootstrap() {
   window.dev = { teamsAttendanceManager };
 
   prepareDistributionToggle();
+  prepareSidebarToggle();
+  setHeaderHeightVar();
+  window.addEventListener('resize', debounce(() => setHeaderHeightVar(), 120));
 
   enableDropArea();
 }
@@ -712,6 +734,14 @@ function enableGraphView() {
   generalStats.style.display = "grid";
   distributionToggle.style.display = "flex";
   distributionChart.style.display = "grid";
+  const listView = document.getElementById("attendeesListView");
+  if (listView) listView.classList.remove("hidden");
+  const restoreBtn = document.getElementById("restoreListButton");
+  if (restoreBtn) restoreBtn.classList.add("hidden");
+  const toggleBtn = document.getElementById("toggleList");
+  if (toggleBtn) toggleBtn.textContent = "Ocultar lista";
+  const dashboard = document.getElementById("dashboard");
+  if (dashboard) dashboard.classList.add("two-columns");
 }
 
 function resetEventListeners(element) {
@@ -766,6 +796,17 @@ function enableDropArea() {
     totalAttendees: 0,
     averageAttendees: 0,
   };
+  const listView = document.getElementById("attendeesListView");
+  if (listView) listView.classList.add("hidden");
+  const sidebar = document.getElementById("attendeeDetail");
+  if (sidebar) {
+    sidebar.classList.remove("open");
+    sidebar.setAttribute("aria-hidden", "true");
+  }
+  const restoreBtn = document.getElementById("restoreListButton");
+  if (restoreBtn) restoreBtn.classList.add("hidden");
+  const dashboard = document.getElementById("dashboard");
+  if (dashboard) dashboard.classList.remove("two-columns");
 }
 
 function getTimelineResolution() {
@@ -1234,6 +1275,12 @@ function updateDashboardForRange({ start, end }) {
     end,
     view: currentDistributionView,
   });
+  // Populate attendees list view for the selected range
+  try {
+    fillAttendeesList(attendees, { start, end });
+  } catch (err) {
+    console.warn("Error filling attendees list:", err);
+  }
 }
 
 function buildGraph(data) {
@@ -1438,6 +1485,189 @@ function decodeFileContent(arrayBuffer) {
   return new TextDecoder(encoding).decode(bytes);
 }
 
+function debounce(fn, wait = 200) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
+function prepareSidebarToggle() {
+  const btn = document.getElementById("toggleSidebarButton");
+  const sidebar = document.getElementById("attendeeDetail");
+  if (!btn) return;
+
+  btn.addEventListener("click", () => {
+    if (!sidebar) return;
+    const isOpen = sidebar.classList.contains("open");
+    if (isOpen) {
+      sidebar.classList.remove("open");
+      sidebar.setAttribute("aria-hidden", "true");
+      btn.setAttribute("aria-pressed", "false");
+    } else {
+      sidebar.classList.add("open");
+      sidebar.setAttribute("aria-hidden", "false");
+      btn.setAttribute("aria-pressed", "true");
+      // If there's a previously selected attendee, render its details
+      if (lastSelectedAttendee) {
+        const { start, end } = currentRangeContext.start && currentRangeContext.end ? currentRangeContext : teamsAttendanceManager.getAttendeesRange();
+        showAttendeeDetail(lastSelectedAttendee, { start, end });
+      } else {
+        const content = document.getElementById("attendeeDetailContent");
+        if (content) content.innerHTML = `<div class="meta">Selecciona un asistente en la lista para ver detalles.</div>`;
+      }
+    }
+  });
+}
+
+function prepareAttendeesListView() {
+  const search = document.getElementById("attendeeSearch");
+  const minDuration = document.getElementById("attendeeMinDuration");
+  const sortSelect = document.getElementById("attendeeSort");
+  const toggleBtn = document.getElementById("toggleList");
+  const closeBtn = document.getElementById("closeAttendeeDetail");
+
+  // Initialize toggle button label according to current visibility
+  const initialListView = document.getElementById("attendeesListView");
+  if (toggleBtn && initialListView) {
+    const isHidden = initialListView.classList.contains("hidden") || window.getComputedStyle(initialListView).display === "none";
+    toggleBtn.textContent = isHidden ? "Mostrar lista" : "Ocultar lista";
+  }
+
+  const onInputChange = debounce(() => {
+    const attendees = lastDistributionRange?.attendees || [];
+    const rangeStart = lastDistributionRange?.start;
+    const rangeEnd = lastDistributionRange?.end;
+    fillAttendeesList(attendees, { start: rangeStart, end: rangeEnd });
+  }, 200);
+
+  search?.addEventListener("input", onInputChange);
+  minDuration?.addEventListener("input", onInputChange);
+  sortSelect?.addEventListener("change", onInputChange);
+
+  toggleBtn?.addEventListener("click", () => {
+    const listView = document.getElementById("attendeesListView");
+    if (!listView) return;
+    const nowHidden = listView.classList.toggle("hidden");
+    toggleBtn.textContent = nowHidden ? "Mostrar lista" : "Ocultar lista";
+    // show/hide the restore button in header
+    const restoreBtn = document.getElementById("restoreListButton");
+    if (restoreBtn) {
+      if (nowHidden) restoreBtn.classList.remove("hidden");
+      else restoreBtn.classList.add("hidden");
+    }
+    // switch dashboard columns
+    const dashboard = document.getElementById("dashboard");
+    if (dashboard) {
+      if (nowHidden) dashboard.classList.remove("two-columns");
+      else dashboard.classList.add("two-columns");
+    }
+  });
+
+  const restoreBtn = document.getElementById("restoreListButton");
+  restoreBtn?.addEventListener("click", () => {
+    const listView = document.getElementById("attendeesListView");
+    if (!listView) return;
+    listView.classList.remove("hidden");
+    restoreBtn.classList.add("hidden");
+    if (toggleBtn) toggleBtn.textContent = "Ocultar lista";
+    const dashboard = document.getElementById("dashboard");
+    if (dashboard) dashboard.classList.add("two-columns");
+  });
+
+  closeBtn?.addEventListener("click", () => {
+    const sidebar = document.getElementById("attendeeDetail");
+    sidebar?.classList.remove("open");
+    sidebar?.setAttribute("aria-hidden", "true");
+  });
+}
+
+function fillAttendeesList(attendees, { start, end } = {}) {
+  const tbody = document.querySelector("#attendeesTable tbody");
+  if (!tbody) return;
+
+  const searchValue = (document.getElementById("attendeeSearch")?.value || "").toLowerCase();
+  const minDurationValue = parseFloat(document.getElementById("attendeeMinDuration")?.value || "0");
+  const sortValue = document.getElementById("attendeeSort")?.value || "name";
+
+  const filtered = (attendees || []).filter((attendee) => {
+    if (!attendee) return false;
+    const name = attendee.participantName || "";
+    const email = attendee.email || "";
+    const durationMin = (attendee.durationSeconds != null ? attendee.durationSeconds : Math.round((attendee.end - attendee.start)/1000))/60;
+    if (minDurationValue && durationMin < minDurationValue) return false;
+    if (searchValue) {
+      return (name.toLowerCase().includes(searchValue) || email.toLowerCase().includes(searchValue));
+    }
+    return true;
+  });
+
+  filtered.sort((a,b) => {
+    if (sortValue === "name") {
+      return (a.participantName || "").localeCompare(b.participantName || "");
+    }
+    if (sortValue === "duration") {
+      const da = a.durationSeconds != null ? a.durationSeconds : (a.end - a.start)/1000;
+      const db = b.durationSeconds != null ? b.durationSeconds : (b.end - b.start)/1000;
+      return db - da;
+    }
+    if (sortValue === "retention") {
+      if (!start || !end) return 0;
+      const ra = teamsAttendanceManager.getAttendeeOverlapInRange({attendee:a, start, end}) ;
+      const rb = teamsAttendanceManager.getAttendeeOverlapInRange({attendee:b, start, end}) ;
+      return rb - ra;
+    }
+    return 0;
+  });
+
+  tbody.innerHTML = "";
+
+  filtered.forEach((attendee) => {
+    const overlapMs = start && end ? teamsAttendanceManager.getAttendeeOverlapInRange({ attendee, start, end }) : (attendee.durationSeconds != null ? attendee.durationSeconds*1000 : (attendee.end - attendee.start));
+    const retention = start && end ? Math.floor((overlapMs / (end - start)) * 10000) / 100 : 0;
+    const durationSeconds = attendee.durationSeconds != null ? attendee.durationSeconds : Math.round((attendee.end - attendee.start)/1000);
+    const durationLabel = teamsAttendanceManager.formatTimeStat(teamsAttendanceManager.getHoursMinutesSeconds(durationSeconds));
+    const tr = document.createElement("tr");
+    tr.className = "list-row";
+    tr.dataset.identityKey = attendee.identityKey || "";
+
+    tr.innerHTML = `<td>${attendee.participantName || ""}${attendee.email ? ` <div class="meta">${attendee.email}</div>` : ""}</td><td>${retention}%</td><td>${durationLabel}</td>`;
+    tr.addEventListener("click", () => {
+      showAttendeeDetail(attendee, { start: start || teamsAttendanceManager.getAttendeesRange().start, end: end || teamsAttendanceManager.getAttendeesRange().end });
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+function showAttendeeDetail(attendee, { start, end } = {}) {
+  const sidebar = document.getElementById("attendeeDetail");
+  const content = document.getElementById("attendeeDetailContent");
+  if (!sidebar || !content || !attendee) return;
+
+  lastSelectedAttendee = attendee;
+
+  const overlapMs = start && end ? teamsAttendanceManager.getAttendeeOverlapInRange({ attendee, start, end }) : (attendee.durationSeconds != null ? attendee.durationSeconds*1000 : (attendee.end - attendee.start));
+  const retentionPct = start && end ? Math.floor((overlapMs / (end - start)) * 10000) / 100 : 0;
+  const durationSeconds = attendee.durationSeconds != null ? attendee.durationSeconds : Math.round((attendee.end - attendee.start)/1000);
+  const durationLabel = teamsAttendanceManager.formatTimeStat(teamsAttendanceManager.getHoursMinutesSeconds(durationSeconds));
+
+  const segmentsHtml = (attendee.segments || []).map(s => `<li>${new Date(s.start).toLocaleString()} → ${new Date(s.end).toLocaleString()}</li>`).join("");
+  const interactions = teamsAttendanceManager.interactionEvents.filter(ev => {
+    const norm = (ev.participantName || "").toLowerCase();
+    const name = (attendee.participantName || "").toLowerCase();
+    const email = (attendee.email || "").toLowerCase();
+    return norm === name || (email && norm.includes(email));
+  });
+  const reactions = interactions.filter(i => i.isReaction);
+
+  content.innerHTML = `\n    <h3>${attendee.participantName || "(sin nombre)"}</h3>\n    <div class="meta">${attendee.email || ""}</div>\n    <div><strong>Duración:</strong> ${durationLabel}</div>\n    <div><strong>Retención:</strong> ${retentionPct}%</div>\n    <div><strong>Segments:</strong><ul>${segmentsHtml}</ul></div>\n    <div><strong>Total interacciones:</strong> ${interactions.length}</div>\n    <div><strong>Total reacciones:</strong> ${reactions.length}</div>\n  `;
+
+  sidebar.classList.add("open");
+  sidebar.setAttribute("aria-hidden", "false");
+}
+
 // Prevent default behavior for drag events
 ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
   dropArea.addEventListener(eventName, (e) => e.preventDefault());
@@ -1488,6 +1718,7 @@ dropArea.addEventListener("drop", (e) => {
     prepareAttendeesDurationQuestion();
     prepareTimeResolutionSelector();
     prepareTimeRangeSelector();
+    prepareAttendeesListView();
     const attendeesRange = teamsAttendanceManager.getAttendeesRange();
     updateDashboardForRange({
       start: attendeesRange.start,
@@ -1497,3 +1728,4 @@ dropArea.addEventListener("drop", (e) => {
 
   reader.readAsArrayBuffer(file);
 });
+
