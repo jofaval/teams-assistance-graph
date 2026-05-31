@@ -684,6 +684,34 @@ nav {
   font-weight: 600;
 }
 
+/* Highcharts: estilo personalizado para el botón "reset zoom" acorde a la identidad */
+.highcharts-reset-zoom,
+.highcharts-button.highcharts-reset-zoom {
+  cursor: pointer;
+  filter: drop-shadow(0 6px 14px rgba(26, 42, 77, 0.12));
+}
+
+.highcharts-reset-zoom .highcharts-button-box {
+  fill: #f4f8fc !important;
+  stroke: rgba(43, 68, 116, 0.06) !important;
+}
+
+.highcharts-reset-zoom text,
+.highcharts-reset-zoom .highcharts-button-text {
+  fill: #142645 !important;
+  font-family: "Space Grotesk", IBM Plex Sans, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+.highcharts-reset-zoom:hover .highcharts-button-box {
+  fill: #e5eef8 !important;
+}
+
+.highcharts-reset-zoom:active .highcharts-button-box {
+  fill: #d6e4f2 !important;
+}
+
 .distribution-title {
   display: inline-block;
   margin-bottom: 0.22rem;

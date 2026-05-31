@@ -1389,6 +1389,26 @@ function buildGraph(data) {
             y: 35,
           },
           relativeTo: "chart",
+          theme: {
+            r: 10,
+            fill: "#f4f8fc",
+            stroke: "rgba(43, 68, 116, 0.06)",
+            style: {
+              color: "#142645",
+              fontFamily: "Space Grotesk, IBM Plex Sans, sans-serif",
+              fontWeight: "600",
+              fontSize: "13px",
+              cursor: "pointer",
+            },
+            states: {
+              hover: {
+                fill: "#e5eef8",
+              },
+              select: {
+                fill: "#d6e4f2",
+              },
+            },
+          },
         },
       },
     },
