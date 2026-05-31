@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## 2026-05-31
 
+## Added
+
+- Error handling and user feedback for unsupported file formats or parsing issues, with clear messages and guidance for users to provide correct input.
+
 ### Modified
 
 - Reset zoom is now more coherent to the rest of the UI.

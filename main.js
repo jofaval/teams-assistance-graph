@@ -826,6 +826,7 @@ function resetEventListeners(element) {
 
 function enableDropArea() {
   document.body.classList.add("drop-area-active");
+  clearFileError();
   dropAreaView.style.display = "block";
   graphView.style.display = "none";
   graphView.innerHTML = "";
@@ -1630,6 +1631,145 @@ function decodeFileContent(arrayBuffer) {
   return new TextDecoder(encoding).decode(bytes);
 }
 
+function showFileError(message, { autoDismiss = true, duration = 6000 } = {}) {
+  // Remove previous toasts to avoid stacking same error repeatedly
+  clearFileError();
+
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    container.setAttribute("aria-live", "assertive");
+    container.setAttribute("aria-atomic", "true");
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = "toast toast-error";
+  toast.setAttribute("role", "alert");
+
+  const msg = document.createElement("div");
+  msg.className = "toast-message";
+  msg.textContent = message;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "toast-close";
+  closeBtn.setAttribute("aria-label", "Close notification");
+  closeBtn.innerHTML = "&times;";
+  closeBtn.addEventListener("click", () => {
+    toast.classList.remove("show");
+    toast.addEventListener(
+      "transitionend",
+      () => {
+        toast.remove();
+        if (container && !container.querySelector(".toast")) container.remove();
+      },
+      { once: true },
+    );
+  });
+
+  toast.appendChild(msg);
+  toast.appendChild(closeBtn);
+  container.appendChild(toast);
+
+  // trigger CSS transition
+  requestAnimationFrame(() => toast.classList.add("show"));
+
+  if (autoDismiss) {
+    setTimeout(() => {
+      if (!toast) return;
+      toast.classList.remove("show");
+      toast.addEventListener(
+        "transitionend",
+        () => {
+          try {
+            toast.remove();
+            if (container && !container.querySelector(".toast")) container.remove();
+          } catch (e) {
+            /* ignore */
+          }
+        },
+        { once: true },
+      );
+    }, duration);
+  }
+}
+
+function clearFileError() {
+  const container = document.getElementById("toastContainer");
+  if (container) container.remove();
+}
+
+function validateTeamsCSVContent(content) {
+  try {
+    const actualContent = teamsAttendanceManager.parseFile(content);
+    const summarySection = teamsAttendanceManager.getSectionContent(actualContent, 1);
+    const participantsSection = teamsAttendanceManager.getSectionContent(actualContent, 2);
+    if (!summarySection || !participantsSection) return false;
+    const rawAttendees = teamsAttendanceManager.getRawAttendees(participantsSection);
+    if (!Array.isArray(rawAttendees) || rawAttendees.length < 2) return false;
+    const parsed = teamsAttendanceManager.parseAttendees(rawAttendees);
+    if (!Array.isArray(parsed) || parsed.length === 0) return false;
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function handleFile(file) {
+  clearFileError();
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (event) {
+    try {
+      const decodedContent = decodeFileContent(event.target.result);
+
+      const isCsvExt = /\.csv$/i.test(file.name || "");
+      const maybeCsvMime = (file.type || "").toLowerCase().includes("csv");
+
+      const englishMessage = 'Invalid data format or extension. Please upload a valid .csv Teams Report for the visualization to work';
+
+      if (!isCsvExt && !maybeCsvMime) {
+        showFileError(englishMessage);
+        return;
+      }
+
+      if (!validateTeamsCSVContent(decodedContent)) {
+        showFileError(englishMessage);
+        return;
+      }
+
+      clearFileError();
+      enableGraphView();
+
+      teamsAttendanceManager.processFile(decodedContent);
+
+      const timeseries = teamsAttendanceManager.getAttendeesAsTimeSeries(
+        getTimelineResolution(),
+      );
+      console.log(`Contenido del archivo (${file.name}):`, timeseries);
+
+      buildGraph(timeseries);
+      prepareAttendeesDurationQuestion();
+      prepareTimeResolutionSelector();
+      prepareTimeRangeSelector();
+      prepareAttendeesListView();
+      const attendeesRange = teamsAttendanceManager.getAttendeesRange();
+      updateDashboardForRange({
+        start: attendeesRange.start,
+        end: attendeesRange.end,
+      });
+    } catch (err) {
+      console.error("Error processing file:", err);
+      showFileError('Invalid data format or extension. Please upload a valid .csv Teams Report for the visualization to work');
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
 function debounce(fn, wait = 200) {
   let timer;
   return (...args) => {
@@ -1776,9 +1916,39 @@ function prepareAttendeesListView() {
   }
 
   const onInputChange = debounce(() => {
-    const attendees = lastDistributionRange?.attendees || [];
-    const rangeStart = lastDistributionRange?.start;
-    const rangeEnd = lastDistributionRange?.end;
+    let attendees = lastDistributionRange?.attendees || [];
+    let rangeStart = lastDistributionRange?.start;
+    let rangeEnd = lastDistributionRange?.end;
+
+    // If a single-attendee view is active and the user starts typing a search,
+    // restore the previous (unfiltered) range so the search can find other people.
+    const q = (search?.value || "").trim();
+    if (q && lastSelectedAttendee) {
+      const restore = previousDistributionRange || { attendees: teamsAttendanceManager.attendees, start: teamsAttendanceManager.getAttendeesRange().start, end: teamsAttendanceManager.getAttendeesRange().end };
+
+      lastSelectedAttendee = null;
+      lastDistributionRange = restore;
+      teamsAttendanceManager.setClipboardAttendees(restore.attendees);
+
+      const ts = computeTimeSeriesForAttendees(restore.attendees, getTimelineResolution(), restore.start, restore.end);
+      buildGraph(ts);
+
+      const stats = teamsAttendanceManager.getGeneralStatsFromAttendeesInRange({ attendees: restore.attendees, start: restore.start, end: restore.end });
+      updateRangeContext({ start: restore.start, end: restore.end, totalAttendees: restore.attendees.length });
+
+      fillGeneralStats(stats);
+      fillDistributionChart({ attendees: restore.attendees, start: restore.start, end: restore.end, view: currentDistributionView });
+
+      try {
+        fillAttendeesList(restore.attendees, { start: restore.start, end: restore.end });
+      } catch (err) {
+        console.warn("Error filling attendees list:", err);
+      }
+
+      previousDistributionRange = null;
+      updateFiltersBar();
+      return;
+    }
 
     // sincronizar estado 'active' de los botones presets con el valor del input
     const currentVal = String(document.getElementById("attendeesDurationInput")?.value || "0");
@@ -2031,34 +2201,16 @@ dropArea.addEventListener("drop", (e) => {
     return;
   }
 
-  enableGraphView();
-
-  // Example: Display file names in the console
-  console.log(`File name: ${file.name}`);
-
-  const reader = new FileReader();
-  reader.onload = function (event) {
-    const decodedContent = decodeFileContent(event.target.result);
-
-    teamsAttendanceManager.processFile(decodedContent);
-
-    const timeseries = teamsAttendanceManager.getAttendeesAsTimeSeries(
-      getTimelineResolution(),
-    );
-    console.log(`Contenido del archivo (${file.name}):`, timeseries);
-
-    buildGraph(timeseries);
-    prepareAttendeesDurationQuestion();
-    prepareTimeResolutionSelector();
-    prepareTimeRangeSelector();
-    prepareAttendeesListView();
-    const attendeesRange = teamsAttendanceManager.getAttendeesRange();
-    updateDashboardForRange({
-      start: attendeesRange.start,
-      end: attendeesRange.end,
-    });
-  };
-
-  reader.readAsArrayBuffer(file);
+  handleFile(file);
 });
+
+// Handle file selection from the input element
+const fileInputEl = document.getElementById("fileInput");
+if (fileInputEl) {
+  fileInputEl.addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    handleFile(f);
+  });
+}
 
