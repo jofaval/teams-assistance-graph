@@ -1367,10 +1367,36 @@ function buildGraph(data) {
     currentChart.destroy();
     currentChart = null;
   }
+  // derive gradient colors from CSS variables (fall back to sensible defaults)
+  const rootStyles = getComputedStyle(document.documentElement);
+  const cap500Hex = (rootStyles.getPropertyValue('--capgemini-500') || '#0072ce').trim();
+  const cap700Hex = (rootStyles.getPropertyValue('--capgemini-700') || '#004b86').trim();
+  function hexToRgb(hex) {
+    const cleaned = String(hex).replace('#', '').trim();
+    const full = cleaned.length === 3 ? cleaned.split('').map((c) => c + c).join('') : cleaned;
+    return {
+      r: parseInt(full.slice(0, 2), 16),
+      g: parseInt(full.slice(2, 4), 16),
+      b: parseInt(full.slice(4, 6), 16),
+    };
+  }
+  const c500 = hexToRgb(cap500Hex);
+  const c700 = hexToRgb(cap700Hex);
+  const fillGradient = {
+    linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+    stops: [
+      [0, `rgba(${c700.r}, ${c700.g}, ${c700.b}, 0.8)`],
+      [1, `rgba(${c500.r}, ${c500.g}, ${c500.b}, 0.8)`],
+    ],
+  };
 
   let chart = Highcharts.chart("graphView", {
     chart: {
       type: "area",
+      backgroundColor: 'transparent',
+      style: {
+        fontFamily: "Space Grotesk, IBM Plex Sans, sans-serif",
+      },
       events: {
         click: function (event) {
           const attendees = teamsAttendanceManager.getAttendeesAtPointInTime(
@@ -1412,6 +1438,18 @@ function buildGraph(data) {
         },
       },
     },
+    plotOptions: {
+      area: {
+        marker: {
+          enabled: false,
+          radius: 3,
+          states: { hover: { enabled: true, radius: 5 } },
+        },
+        lineWidth: 2,
+        states: { hover: { lineWidth: 3 } },
+        fillOpacity: 1,
+      },
+    },
     tooltip: {
       enabled: true,
       shared: true,
@@ -1425,6 +1463,7 @@ function buildGraph(data) {
     },
     title: {
       text: teamsAttendanceManager.generalStats.title,
+      style: { color: cap700Hex, fontWeight: '600', fontSize: '15px' },
     },
     xAxis: {
       type: "datetime",
@@ -1484,8 +1523,18 @@ function buildGraph(data) {
       {
         name: "Attendees",
         data,
+        color: cap500Hex,
+        fillColor: fillGradient,
+        marker: {
+          fillColor: '#ffffff',
+          lineWidth: 2,
+          lineColor: cap500Hex,
+        },
+        lineWidth: 2,
       },
     ],
+    credits: { enabled: false },
+    exporting: { enabled: false },
     time: {
       timezoneOffset: new Date().getTimezoneOffset(),
     },

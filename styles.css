@@ -23,6 +23,8 @@ body {
   --header-height: 64px;
   --accent: #17639f;
   --accent-strong: #2f4f98;
+  --capgemini-500: #0072ce;
+  --capgemini-700: #004b86;
   --accent-contrast: #f4fbff;
   --muted-bg: #f4f8fc;
   --filter-radius: 10px;
@@ -226,11 +228,26 @@ nav {
   min-height: 240px;
   width: 100%;
   border-radius: 16px;
-  background: linear-gradient(180deg, #fefeff 0%, #f7fbff 100%);
+  position: relative;
+  background: white;
   box-shadow: 0 18px 36px rgba(30, 55, 90, 0.1);
   overflow: hidden;
   flex: 1;
   min-height: 0;
+  padding: 10px 12px 8px;
+}
+
+#graphView::before {
+  /* decorative top accent using the requested Capgemini gradient */
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 6px;
+  width: 100%;
+  background: white;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
 }
 
 .attendance-tooltip .highcharts-label-box {
@@ -1139,4 +1156,8 @@ nav {
   background: transparent;
   color: var(--accent-strong);
   cursor: pointer;
+}
+
+.meta {
+  color: #888;
 }

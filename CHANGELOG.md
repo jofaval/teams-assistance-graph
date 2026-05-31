@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Modified
 
 - Reset zoom is now more coherent to the rest of the UI.
+- New color scheme for the graphs, with a more modern and clean look, and better contrast for accessibility.
+
+### Fixed
+
+- Selecting a member and searching, unselects the member and shows all the attendees again. Now it keeps the selected member and filters the attendees by the search query.
 
 ## 2026-05-26
 
