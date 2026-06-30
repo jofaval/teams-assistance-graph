@@ -368,13 +368,18 @@ class TeamsAttendance {
     return { hours, minutes, seconds };
   }
 
-  getTotalWatchTimeStat(attendees) {
+  getTotalWatchTimeStat(attendees, start = null, end = null) {
     const totalWatchHours = attendees.reduce((acc, attendee) => {
-      const duration =
-        attendee.durationSeconds != null
-          ? attendee.durationSeconds / 60
-          : (attendee.end - attendee.start) / 1000 / 60;
-      return acc + duration;
+      let durationMs;
+      if (start && end) {
+        durationMs = this.getAttendeeOverlapInRange({ attendee, start, end });
+      } else {
+        durationMs =
+          attendee.durationSeconds != null
+            ? attendee.durationSeconds * 1000
+            : attendee.end - attendee.start;
+      }
+      return acc + durationMs / 1000 / 60;
     }, 0);
     const hours = Math.floor(totalWatchHours / 60);
     const minutes = Math.floor(totalWatchHours % 60);
@@ -393,8 +398,8 @@ class TeamsAttendance {
       .join(" ");
   }
 
-  parseTotalWatchHoursStat(attendees) {
-    const { hours, minutes, seconds } = this.getTotalWatchTimeStat(attendees);
+  parseTotalWatchHoursStat(attendees, start = null, end = null) {
+    const { hours, minutes, seconds } = this.getTotalWatchTimeStat(attendees, start, end);
 
     return this.formatTimeStat({ hours, minutes, seconds });
   }
@@ -621,7 +626,7 @@ class TeamsAttendance {
 
     const totalAttendees = attendees.length;
     const unknownAttendees = this.generalStats.unknownAttendees;
-    const totalWatchTime = this.parseTotalWatchHoursStat(attendees);
+    const totalWatchTime = this.parseTotalWatchHoursStat(attendees, start, end);
     const identityKeys = (attendees || []).map((a) => a.identityKey).filter(Boolean);
     const reactionsStats = this.getReactionStats({
       start,
@@ -1456,6 +1461,50 @@ function buildGraph(data) {
       shared: true,
       useHTML: true,
       className: "attendance-tooltip",
+      positioner: function (labelWidth, labelHeight) {
+        const chart = this.chart;
+        const point = chart.hoverPoint;
+        
+        if (!point) {
+          return undefined;
+        }
+        
+        const plotLeft = chart.plotLeft;
+        const plotTop = chart.plotTop;
+        const chartWidth = chart.chartWidth;
+        
+        // Centrar horizontalmente respecto al punto (relativo al chart container)
+        let x = point.plotX + plotLeft - labelWidth / 8;
+        
+        // Posicionar encima del punto con offset
+        let y = point.plotY + plotTop - labelHeight - 12;
+        
+        // Ajustar si se sale por los bordes horizontales con más tolerancia
+        // Permitir que se salga un poco de los extremos
+        const minX = 0;  // Permitir hasta 30% fuera a la izquierda
+        const maxX = chartWidth + labelWidth * 0.3;  // Permitir hasta 30% fuera a la derecha
+        
+        if (x < minX) {
+          x = minX;
+        } else if (x > maxX) {
+          x = maxX;
+        }
+        
+        // Ajustar si se sale por los bordes verticales
+        const minY = 0;
+        const maxY = chart.chartHeight - labelHeight;
+        
+        if (y < minY) {
+          // Si no cabe arriba, posicionar abajo del punto
+          y = point.plotY + plotTop + 12;
+        }
+        
+        if (y > maxY) {
+          y = maxY;
+        }
+        
+        return { x, y };
+      },
       formatter: function () {
         const point = this.points?.[0]?.point || this.point;
         const pointIndex = point.index;
@@ -1471,6 +1520,16 @@ function buildGraph(data) {
       plotLines: criticalMomentLines,
       title: {
         text: "Time",
+        style: {
+          color: '#0f1f3a',
+          fontWeight: '600',
+        },
+      },
+      labels: {
+        style: {
+          color: '#142645',
+          fontWeight: '500',
+        },
       },
       events: {
         setExtremes: function (e) {
@@ -1518,6 +1577,16 @@ function buildGraph(data) {
     yAxis: {
       title: {
         text: "Number of Attendees",
+        style: {
+          color: '#0f1f3a',
+          fontWeight: '600',
+        },
+      },
+      labels: {
+        style: {
+          color: '#142645',
+          fontWeight: '500',
+        },
       },
     },
     series: [
